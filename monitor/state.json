@@ -1,4 +1,16 @@
 {
-  "BTCUSDT": { "lastVerdict": null, "stopLossAlerted": false, "takeProfitAlerted": false, "technicalSellAlerted": false, "trendBreakAlerted": false },
-  "ETHUSDT": { "lastVerdict": null, "stopLossAlerted": false, "takeProfitAlerted": false, "technicalSellAlerted": false, "trendBreakAlerted": false }
+  "BTCUSDT": {
+    "lastVerdict": null,
+    "stopLossAlerted": false,
+    "takeProfitAlerted": false,
+    "technicalSellAlerted": false,
+    "trendBreakAlerted": false
+  },
+  "ETHUSDT": {
+    "lastVerdict": null,
+    "stopLossAlerted": false,
+    "takeProfitAlerted": false,
+    "technicalSellAlerted": false,
+    "trendBreakAlerted": false
+  }
 }
