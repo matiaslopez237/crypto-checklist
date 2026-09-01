@@ -1,7 +1,7 @@
 {
   "BTCUSDT": {
     "lastVerdict": "watch",
-    "stopLossAlerted": true,
+    "stopLossAlerted": false,
     "takeProfitAlerted": false,
     "technicalSellAlerted": false,
     "trendBreakAlerted": false
