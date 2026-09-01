@@ -1,4 +1,4 @@
 {
-  "BTCUSDT": { "avgBuyPrice": null, "qty": 0, "stopLossPct": 10, "takeProfitPct": 20, "feePct": 0.1 },
+  "BTCUSDT": { "avgBuyPrice": 100000, "qty": 0.01, "stopLossPct": 10, "takeProfitPct": 20, "feePct": 0.1 },
   "ETHUSDT": { "avgBuyPrice": null, "qty": 0, "stopLossPct": 10, "takeProfitPct": 20, "feePct": 0.1 }
 }
