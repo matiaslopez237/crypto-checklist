@@ -2,8 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchDailyKlines } from "./lib/binance";
 import { computeIndicators } from "./lib/indicators";
 import { buildBuyChecklist, buildSellChecklist } from "./lib/checklist";
-import { addJournalEntry, loadJournal, removeJournalEntry } from "./lib/storage";
+import {
+  addJournalEntry,
+  clearGitHubSyncConfig,
+  loadGitHubSyncConfig,
+  loadJournal,
+  removeJournalEntry,
+  saveGitHubSyncConfig,
+  type GitHubSyncConfig,
+} from "./lib/storage";
 import { computeOpenPosition } from "./lib/journalStats";
+import { syncPositionsToGitHub } from "./lib/githubSync";
 import type { Candle, Indicators, JournalEntry, Pair } from "./lib/types";
 import { PairSelector } from "./components/PairSelector";
 import { PriceHeader } from "./components/PriceHeader";
@@ -11,6 +20,9 @@ import { VerdictBanner } from "./components/VerdictBanner";
 import { BuyChecklist } from "./components/BuyChecklist";
 import { SellChecklist } from "./components/SellChecklist";
 import { Journal } from "./components/Journal";
+import { SyncSettings, type SyncStatus } from "./components/SyncSettings";
+
+const ALL_PAIRS: Pair[] = ["BTCUSDT", "ETHUSDT"];
 
 function App() {
   const [pair, setPair] = useState<Pair>("BTCUSDT");
@@ -26,8 +38,29 @@ function App() {
 
   const [journal, setJournal] = useState<JournalEntry[]>([]);
 
+  const [githubConfig, setGithubConfig] = useState<GitHubSyncConfig | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ kind: "idle" });
+
   useEffect(() => {
     setJournal(loadJournal());
+    setGithubConfig(loadGitHubSyncConfig());
+  }, []);
+
+  const syncToGitHub = useCallback(async (entries: JournalEntry[], config: GitHubSyncConfig | null) => {
+    if (!config) return;
+    setSyncStatus({ kind: "syncing" });
+    try {
+      const positions = Object.fromEntries(
+        ALL_PAIRS.map((p) => {
+          const pos = computeOpenPosition(entries.filter((e) => e.pair === p));
+          return [p, { avgBuyPrice: pos.qty > 0 ? pos.avgBuyPrice : null, qty: pos.qty }];
+        }),
+      );
+      await syncPositionsToGitHub(config, positions);
+      setSyncStatus({ kind: "ok", at: Date.now() });
+    } catch (e) {
+      setSyncStatus({ kind: "error", message: e instanceof Error ? e.message : "error desconocido" });
+    }
   }, []);
 
   // Switching pairs starts fresh: default back to the auto-computed entry price for that pair.
@@ -70,11 +103,27 @@ function App() {
   const positionValueUsdt = ind && hasAutoPosition ? position.qty * ind.price : null;
 
   function handleAddEntry(entry: JournalEntry) {
-    setJournal(addJournalEntry(entry));
+    const entries = addJournalEntry(entry);
+    setJournal(entries);
+    syncToGitHub(entries, githubConfig);
   }
 
   function handleRemoveEntry(id: string) {
-    setJournal(removeJournalEntry(id));
+    const entries = removeJournalEntry(id);
+    setJournal(entries);
+    syncToGitHub(entries, githubConfig);
+  }
+
+  function handleSaveGitHubConfig(config: GitHubSyncConfig) {
+    saveGitHubSyncConfig(config);
+    setGithubConfig(config);
+    syncToGitHub(journal, config);
+  }
+
+  function handleClearGitHubConfig() {
+    clearGitHubSyncConfig();
+    setGithubConfig(null);
+    setSyncStatus({ kind: "idle" });
   }
 
   return (
@@ -125,6 +174,13 @@ function App() {
             entries={pairEntries}
             onAdd={handleAddEntry}
             onRemove={handleRemoveEntry}
+          />
+          <SyncSettings
+            config={githubConfig}
+            onSave={handleSaveGitHubConfig}
+            onClear={handleClearGitHubConfig}
+            status={syncStatus}
+            onSyncNow={() => syncToGitHub(journal, githubConfig)}
           />
         </>
       )}

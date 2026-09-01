@@ -27,3 +27,29 @@ export function removeJournalEntry(id: string): JournalEntry[] {
   saveJournal(entries);
   return entries;
 }
+
+export interface GitHubSyncConfig {
+  token: string;
+  owner: string;
+  repo: string;
+}
+
+const GITHUB_SYNC_KEY = "crypto-checklist:github-sync";
+
+export function loadGitHubSyncConfig(): GitHubSyncConfig | null {
+  try {
+    const raw = localStorage.getItem(GITHUB_SYNC_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as GitHubSyncConfig;
+  } catch {
+    return null;
+  }
+}
+
+export function saveGitHubSyncConfig(config: GitHubSyncConfig): void {
+  localStorage.setItem(GITHUB_SYNC_KEY, JSON.stringify(config));
+}
+
+export function clearGitHubSyncConfig(): void {
+  localStorage.removeItem(GITHUB_SYNC_KEY);
+}
