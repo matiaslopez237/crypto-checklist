@@ -1,6 +1,10 @@
 import type { Candle, Pair } from "./types";
 
-const KLINES_URL = "https://api.binance.com/api/v3/klines";
+// data-api.binance.vision is Binance's public market-data mirror: same response shape
+// as api.binance.com, but meant for exactly this kind of read-only, unauthenticated
+// access and not subject to the same regional trading restrictions (api.binance.com
+// returns 451 from US-hosted infra, which is where GitHub Actions runners live).
+const KLINES_URL = "https://data-api.binance.vision/api/v3/klines";
 
 // Binance kline array shape: [openTime, open, high, low, close, volume, closeTime, ...]
 type RawKline = [number, string, string, string, string, string, number, ...unknown[]];

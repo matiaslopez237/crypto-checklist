@@ -1,13 +1,13 @@
 {
   "BTCUSDT": {
-    "lastVerdict": null,
-    "stopLossAlerted": false,
+    "lastVerdict": "watch",
+    "stopLossAlerted": true,
     "takeProfitAlerted": false,
     "technicalSellAlerted": false,
     "trendBreakAlerted": false
   },
   "ETHUSDT": {
-    "lastVerdict": null,
+    "lastVerdict": "watch",
     "stopLossAlerted": false,
     "takeProfitAlerted": false,
     "technicalSellAlerted": false,

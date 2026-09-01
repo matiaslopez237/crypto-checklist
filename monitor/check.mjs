@@ -109,16 +109,21 @@ async function handleAlert(pairState, flagKey, isActive, notify) {
 async function main() {
   const positions = await readJson(POSITIONS_PATH);
   const state = await readJson(STATE_PATH);
+  let hadError = false;
 
   for (const pair of Object.keys(PAIR_LABELS)) {
     try {
       await checkPair(pair, positions, state);
     } catch (err) {
+      hadError = true;
       console.error(`Error checking ${pair}:`, err);
     }
   }
 
   await writeFile(STATE_PATH, JSON.stringify(state, null, 2) + "\n");
+
+  // Fail the job loudly instead of masking a real error (e.g. Binance unreachable) as success.
+  if (hadError) process.exitCode = 1;
 }
 
 main();
