@@ -171,5 +171,40 @@ export function buildSellChecklist(
         }
       : { label: "Ruptura de tendencia de corto plazo (SMA50)", passed: false, detail: "SMA50 aún no disponible" };
 
-  return { pnlPct, grossPnlPct, overbought, nearResistance, stopLoss, takeProfit, trendBreak };
+  // Position-sizing suggestion: stop loss is a hard rule (protect capital, full exit).
+  // Everything else scales out progressively — the more signals confirm together,
+  // the larger the suggested trim, capped at 100%.
+  let suggestedSellPct = 0;
+  const suggestedSellReasons: string[] = [];
+
+  if (stopLoss.passed) {
+    suggestedSellPct = 100;
+    suggestedSellReasons.push(stopLoss.label);
+  } else {
+    if (takeProfit.passed) {
+      suggestedSellPct += 50;
+      suggestedSellReasons.push(takeProfit.label);
+    }
+    if (trendBreak.passed) {
+      suggestedSellPct += 40;
+      suggestedSellReasons.push(trendBreak.label);
+    }
+    if (overbought.passed && nearResistance.passed) {
+      suggestedSellPct += 20;
+      suggestedSellReasons.push("RSI sobrecomprado cerca de resistencia");
+    }
+    suggestedSellPct = Math.min(suggestedSellPct, 100);
+  }
+
+  return {
+    pnlPct,
+    grossPnlPct,
+    overbought,
+    nearResistance,
+    stopLoss,
+    takeProfit,
+    trendBreak,
+    suggestedSellPct,
+    suggestedSellReasons,
+  };
 }

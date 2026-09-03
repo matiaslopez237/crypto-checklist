@@ -44,11 +44,13 @@ async function checkPair(pair, positions, state) {
   if (pos && pos.avgBuyPrice && pos.qty > 0) {
     const sellResult = buildSellChecklist(ind, pos.avgBuyPrice, pos.stopLossPct, pos.feePct, pos.takeProfitPct);
 
+    const sellSuggestion = sellResult.suggestedSellPct > 0 ? `\n\n💡 Sugerencia: vender ${sellResult.suggestedSellPct}%` : "";
+
     await handleAlert(pairState, "stopLossAlerted", sellResult.stopLoss.passed, async () =>
       sendTelegram(
         `🔴 <b>${label}: alerta de stop loss</b>\n` +
           `PnL neto: ${sellResult.pnlPct.toFixed(1)}% (límite -${pos.stopLossPct}%)\n` +
-          `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${pos.avgBuyPrice.toFixed(2)}`,
+          `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${pos.avgBuyPrice.toFixed(2)}${sellSuggestion}`,
       ),
     );
 
@@ -56,7 +58,7 @@ async function checkPair(pair, positions, state) {
       sendTelegram(
         `🟡 <b>${label}: objetivo de ganancia alcanzado</b>\n` +
           `PnL neto: +${sellResult.pnlPct.toFixed(1)}% (objetivo +${pos.takeProfitPct}%)\n` +
-          `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${pos.avgBuyPrice.toFixed(2)}`,
+          `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${pos.avgBuyPrice.toFixed(2)}${sellSuggestion}`,
       ),
     );
 
@@ -65,12 +67,12 @@ async function checkPair(pair, positions, state) {
       sendTelegram(
         `🟠 <b>${label}: señal técnica de venta</b>\n` +
           `RSI sobrecomprado y precio cerca de la resistencia de 20 días.\n` +
-          `${sellResult.overbought.detail} · ${sellResult.nearResistance.detail}`,
+          `${sellResult.overbought.detail} · ${sellResult.nearResistance.detail}${sellSuggestion}`,
       ),
     );
 
     await handleAlert(pairState, "trendBreakAlerted", sellResult.trendBreak.passed, async () =>
-      sendTelegram(`🟠 <b>${label}: ruptura de tendencia</b>\n${sellResult.trendBreak.detail}`),
+      sendTelegram(`🟠 <b>${label}: ruptura de tendencia</b>\n${sellResult.trendBreak.detail}${sellSuggestion}`),
     );
   }
 }

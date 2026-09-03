@@ -156,6 +156,16 @@ export function SellChecklist({
               {result.grossPnlPct.toFixed(1)}%, antes de comisiones)
             </span>
           </div>
+          {result.suggestedSellPct > 0 && (
+            <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-center dark:border-amber-700 dark:bg-amber-900/30">
+              <p className="text-sm font-bold text-amber-900 dark:text-amber-300">
+                Sugerencia: vender {result.suggestedSellPct}%
+              </p>
+              <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-400">
+                {result.suggestedSellReasons.join(" + ")}
+              </p>
+            </div>
+          )}
           <ChecklistRow item={result.overbought} />
           <ChecklistRow item={result.nearResistance} />
           <ChecklistRow item={result.trendBreak} />

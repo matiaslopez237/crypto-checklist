@@ -47,6 +47,8 @@ export interface SellChecklistResult {
   stopLoss: ChecklistItem;
   takeProfit: ChecklistItem;
   trendBreak: ChecklistItem;
+  suggestedSellPct: number;
+  suggestedSellReasons: string[];
 }
 
 export interface JournalEntry {
