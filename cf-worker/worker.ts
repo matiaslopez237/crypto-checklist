@@ -11,6 +11,7 @@ import type { Pair } from "../src/lib/types";
 export interface Env {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
+  TELEGRAM_WEBHOOK_SECRET: string;
   GITHUB_TOKEN: string;
   GITHUB_OWNER: string;
   GITHUB_REPO: string;
@@ -181,6 +182,12 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== "POST") return new Response("ok");
+    // Telegram includes this header on every webhook delivery when a secret_token is
+    // configured — without it, anyone who finds this URL could forge commands (the
+    // chat_id alone isn't secret).
+    if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.TELEGRAM_WEBHOOK_SECRET) {
+      return new Response("forbidden", { status: 403 });
+    }
     try {
       return await handleTelegramWebhook(request, env);
     } catch (err) {
