@@ -7,7 +7,7 @@
     "trendBreakAlerted": false
   },
   "ETHUSDT": {
-    "lastVerdict": "buy",
+    "lastVerdict": "watch",
     "stopLossAlerted": false,
     "takeProfitAlerted": false,
     "technicalSellAlerted": false,
