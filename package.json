@@ -11,13 +11,17 @@
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite --port 5174\" \"wait-on tcp:5174 && cross-env NODE_ENV=development electron .\"",
     "electron:package": "tsc -b && vite build && electron-packager . \"Checklist BTC-ETH\" --platform=win32 --arch=x64 --out=release --overwrite --asar --ignore=\"^/(node_modules|src|release|public|\\.claude|\\.git|tsconfig.*|vite\\.config\\.ts|eslint.*|index\\.html)($|/)\"",
-    "electron:build": "tsc -b && vite build && electron-builder"
+    "electron:build": "tsc -b && vite build && electron-builder",
+    "worker:typecheck": "tsc --project cf-worker/tsconfig.json",
+    "worker:dev": "wrangler dev --local --config cf-worker/wrangler.toml",
+    "worker:deploy": "npm run worker:typecheck && wrangler deploy --config cf-worker/wrangler.toml"
   },
   "dependencies": {
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260903.1",
     "@electron/packager": "^20.0.4",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.2",
@@ -32,7 +36,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
-    "wait-on": "^9.1.0"
+    "wait-on": "^9.1.0",
+    "wrangler": "^4.129.0"
   },
   "build": {
     "appId": "com.matias.crypto-checklist",
