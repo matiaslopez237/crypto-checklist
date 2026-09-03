@@ -1,15 +1,15 @@
-name: Monitor BTC/ETH
+name: Telegram Commands
 
 on:
   schedule:
-    - cron: "0 * * * *" # every hour (UTC)
+    - cron: "*/10 * * * *" # every 10 minutes (UTC) — lets phone commands update your position quickly
   workflow_dispatch: {} # lets you trigger a manual run from the Actions tab, for testing
 
 permissions:
   contents: write
 
 jobs:
-  check:
+  process:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -18,20 +18,20 @@ jobs:
         with:
           node-version: 24
 
-      - name: Run checklist and notify
-        run: node monitor/check.mjs
+      - name: Process pending Telegram commands
+        run: node monitor/process-commands.mjs
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Persist alert state
+      - name: Persist position and offset
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add monitor/state.json
+          git add monitor/positions.json monitor/telegram-offset.json
           git diff --staged --quiet && exit 0
-          git commit -m "chore: update monitor state"
-          # The telegram-commands workflow can push at the same time; retry on conflict.
+          git commit -m "chore: aplicar comando de Telegram"
+          # The market-check workflow can push at the same time; retry on conflict.
           for i in 1 2 3; do
             git pull --rebase && git push && break
             sleep 5

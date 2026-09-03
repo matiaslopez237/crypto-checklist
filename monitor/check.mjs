@@ -8,6 +8,7 @@ import path from "node:path";
 import { fetchDailyKlines } from "../src/lib/binance.ts";
 import { computeIndicators } from "../src/lib/indicators.ts";
 import { buildBuyChecklist, buildSellChecklist } from "../src/lib/checklist.ts";
+import { sendTelegram } from "./telegram.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const POSITIONS_PATH = path.join(__dirname, "positions.json");
@@ -17,27 +18,6 @@ const PAIR_LABELS = { BTCUSDT: "BTC/USDT", ETHUSDT: "ETH/USDT" };
 
 async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, "utf-8"));
-}
-
-async function sendTelegram(text) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-
-  if (!token || !chatId) {
-    console.log("[dry-run, no TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID set] would send:\n" + text);
-    return;
-  }
-
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Telegram API error ${res.status}: ${body}`);
-  }
 }
 
 async function checkPair(pair, positions, state) {
