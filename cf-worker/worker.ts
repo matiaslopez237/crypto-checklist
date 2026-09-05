@@ -1,7 +1,7 @@
 // Cloudflare Worker: replaces the unreliable GitHub Actions schedule with
 // - fetch(): a Telegram webhook, so /comprar /vender /posicion /reset apply instantly
 // - scheduled(): a real cron trigger for the BTC/ETH market check + alerts
-import { fetchDailyKlines } from "../src/lib/binance";
+import { fetchDailyKlines } from "../src/lib/kraken";
 import { computeIndicators } from "../src/lib/indicators";
 import { buildBuyChecklist, buildSellChecklist } from "../src/lib/checklist";
 import { getGitHubFile, putGitHubFile, type GitHubRepoConfig } from "../src/lib/githubContents";
