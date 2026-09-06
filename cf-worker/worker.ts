@@ -162,8 +162,24 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
     return new Response("ok");
   }
 
+  // /posicion wants a live PnL%, which needs the current price — skip the extra
+  // Kraken calls for commands that don't need it (comprar/vender/reset).
+  const isPositionQuery = /^\/?(posicion|position|status)(@|$|\s)/i.test(msg.text.trim());
+  let prices: Partial<Record<Pair, number>> | undefined;
+  if (isPositionQuery) {
+    prices = {};
+    for (const pair of Object.keys(PAIR_LABELS) as Pair[]) {
+      try {
+        const candles = await fetchDailyKlines(pair, 1);
+        prices[pair] = candles[candles.length - 1].close;
+      } catch (err) {
+        console.error(`Error fetching price for ${pair}:`, err);
+      }
+    }
+  }
+
   const { positions, sha } = await readPositions(env);
-  const result = handleTelegramCommand(msg.text, positions);
+  const result = handleTelegramCommand(msg.text, positions, prices);
 
   if (result.changed) {
     await putGitHubFile(

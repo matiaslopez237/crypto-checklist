@@ -46,12 +46,27 @@ function applySell(pos: StoredPosition, price: number, amountUsdt: number): Stor
   return { ...pos, qty: newQty, avgBuyPrice: newQty > 0 ? pos.avgBuyPrice : null };
 }
 
-function positionSummary(positions: PositionsFile): string {
+// Same net-PnL formula as buildSellChecklist in checklist.ts (fee paid on both legs).
+function netPnlPct(entryPrice: number, price: number, feePct: number): number {
+  const cost = entryPrice * (1 + feePct / 100);
+  const proceeds = price * (1 - feePct / 100);
+  return ((proceeds - cost) / cost) * 100;
+}
+
+function positionSummary(positions: PositionsFile, prices?: Partial<Record<Pair, number>>): string {
   return (Object.keys(PAIR_LABELS) as Pair[])
     .map((pair) => {
       const pos = positions[pair];
       if (!pos || !pos.avgBuyPrice || pos.qty <= 0) return `${PAIR_LABELS[pair]}: sin posición`;
-      return `${PAIR_LABELS[pair]}: ${pos.qty.toFixed(6)} @ $${fmt(pos.avgBuyPrice)} promedio`;
+
+      const price = prices?.[pair];
+      let pnlText = "";
+      if (price) {
+        const pnlPct = netPnlPct(pos.avgBuyPrice, price, pos.feePct);
+        pnlText = ` · PnL neto: ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`;
+      }
+
+      return `${PAIR_LABELS[pair]}: ${pos.qty.toFixed(6)} @ $${fmt(pos.avgBuyPrice)} promedio${pnlText}`;
     })
     .join("\n");
 }
@@ -63,7 +78,11 @@ export interface CommandResult {
 
 // Mutates `positions` in place when the command changes something (mirrors process-commands.mjs's
 // prior behavior) and returns the reply text to send back plus whether a write is needed.
-export function handleTelegramCommand(text: string, positions: PositionsFile): CommandResult {
+export function handleTelegramCommand(
+  text: string,
+  positions: PositionsFile,
+  prices?: Partial<Record<Pair, number>>,
+): CommandResult {
   const parts = text.trim().split(/\s+/);
   const cmd = parts[0].toLowerCase().replace(/^\//, "").replace(/@.*$/, "");
 
@@ -102,7 +121,7 @@ export function handleTelegramCommand(text: string, positions: PositionsFile): C
   }
 
   if (cmd === "posicion" || cmd === "position" || cmd === "status") {
-    return { reply: positionSummary(positions) };
+    return { reply: positionSummary(positions, prices) };
   }
 
   if (cmd === "reset") {
