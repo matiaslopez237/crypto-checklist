@@ -19,13 +19,15 @@ const HELP_TEXT =
   "/comprar BTC 65000 500 — registra una compra (par, precio, monto en USDT)\n" +
   "/vender BTC 65000 500 — registra una venta\n" +
   "/posicion — muestra tu posición actual\n" +
-  "/reset BTC — limpia la posición de ese par";
+  "/reset BTC — limpia la posición de ese par\n" +
+  "/alerta BTC 68000 — avisa una vez cuando el precio cruce ese nivel\n" +
+  "/alertas — lista tus alertas de precio pendientes";
 
-function normalizePair(raw: string | undefined): Pair | null {
+export function normalizePair(raw: string | undefined): Pair | null {
   return raw ? (PAIR_ALIASES[raw.toUpperCase()] ?? null) : null;
 }
 
-function fmt(n: number): string {
+export function fmt(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 

@@ -5,7 +5,7 @@ import { fetchDailyKlines } from "../src/lib/kraken";
 import { computeIndicators } from "../src/lib/indicators";
 import { buildBuyChecklist, buildSellChecklist } from "../src/lib/checklist";
 import { getGitHubFile, putGitHubFile, type GitHubRepoConfig } from "../src/lib/githubContents";
-import { handleTelegramCommand, PAIR_LABELS, type PositionsFile } from "../src/lib/telegramCommands";
+import { handleTelegramCommand, normalizePair, fmt, PAIR_LABELS, type PositionsFile } from "../src/lib/telegramCommands";
 import type { Pair } from "../src/lib/types";
 
 export interface Env {
@@ -43,6 +43,39 @@ const EMPTY_STATE: PairAlertState = {
 // entry than the one you were already told about.
 const BUY_SCORE_IMPROVEMENT_THRESHOLD = 15;
 
+interface PriceAlert {
+  id: string;
+  pair: Pair;
+  targetPrice: number;
+  side: "above" | "below"; // which side of targetPrice the price was on when created
+}
+
+const PRICE_ALERTS_KEY = "PRICE_ALERTS";
+const DIGEST_KEY = "DIGEST";
+const DIGEST_HOUR_UTC = 12; // ~09:00 in Argentina (UTC-3)
+
+function sideOf(price: number, target: number): "above" | "below" {
+  return price >= target ? "above" : "below";
+}
+
+async function loadPriceAlerts(env: Env): Promise<PriceAlert[]> {
+  const stored = await env.MONITOR_STATE.get(PRICE_ALERTS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+async function savePriceAlerts(env: Env, alerts: PriceAlert[]): Promise<void> {
+  await env.MONITOR_STATE.put(PRICE_ALERTS_KEY, JSON.stringify(alerts));
+}
+
+interface PairSummary {
+  label: string;
+  price: number;
+  score: number;
+  maxScore: number;
+  verdict: string;
+  pnlPct: number | null;
+}
+
 function githubConfig(env: Env): GitHubRepoConfig {
   return { token: env.GITHUB_TOKEN, owner: env.GITHUB_OWNER, repo: env.GITHUB_REPO };
 }
@@ -79,11 +112,29 @@ async function handleAlert(
   }
 }
 
-async function checkPair(env: Env, pair: Pair, positions: PositionsFile): Promise<void> {
+async function checkPair(
+  env: Env,
+  pair: Pair,
+  positions: PositionsFile,
+  priceAlerts: PriceAlert[],
+): Promise<{ summary: PairSummary; firedAlertIds: string[] }> {
   const label = PAIR_LABELS[pair];
   const candles = await fetchDailyKlines(pair, 210);
   const ind = computeIndicators(candles);
   const buyResult = buildBuyChecklist(ind);
+
+  const firedAlertIds: string[] = [];
+  for (const alert of priceAlerts) {
+    if (alert.pair !== pair) continue;
+    const currentSide = sideOf(ind.price, alert.targetPrice);
+    if (currentSide !== alert.side) {
+      await sendTelegram(
+        env,
+        `🔔 <b>${label} cruzó $${fmt(alert.targetPrice)}</b>\nPrecio actual: $${ind.price.toFixed(2)}`,
+      );
+      firedAlertIds.push(alert.id);
+    }
+  }
 
   const stored = await env.MONITOR_STATE.get(pair);
   const state: PairAlertState = { ...EMPTY_STATE, ...(stored ? JSON.parse(stored) : {}) };
@@ -115,10 +166,12 @@ async function checkPair(env: Env, pair: Pair, positions: PositionsFile): Promis
   }
   state.lastVerdict = buyResult.verdict;
 
+  let pnlPct: number | null = null;
   const pos = positions[pair];
   if (pos && pos.avgBuyPrice && pos.qty > 0) {
     const avgBuyPrice = pos.avgBuyPrice;
     const sellResult = buildSellChecklist(ind, avgBuyPrice, pos.stopLossPct, pos.feePct, pos.takeProfitPct);
+    pnlPct = sellResult.pnlPct;
     const suggestion = sellResult.suggestedSellPct > 0 ? `\n\n💡 Sugerencia: vender ${sellResult.suggestedSellPct}%` : "";
 
     await handleAlert(state, "stopLossAlerted", sellResult.stopLoss.passed, () =>
@@ -155,6 +208,20 @@ async function checkPair(env: Env, pair: Pair, positions: PositionsFile): Promis
   }
 
   await env.MONITOR_STATE.put(pair, JSON.stringify(state));
+
+  return {
+    summary: { label, price: ind.price, score: buyResult.score, maxScore: buyResult.maxScore, verdict: buyResult.verdict, pnlPct },
+    firedAlertIds,
+  };
+}
+
+function buildDigestText(summaries: PairSummary[]): string {
+  const lines = summaries.map((s) => {
+    const verdictLabel = s.verdict === "buy" ? "zona de compra" : s.verdict === "watch" ? "zona dudosa" : "no conviene";
+    const pnlText = s.pnlPct !== null ? ` · PnL neto: ${s.pnlPct >= 0 ? "+" : ""}${s.pnlPct.toFixed(1)}%` : "";
+    return `${s.label}: $${fmt(s.price)} · Score ${s.score}/${s.maxScore} (${verdictLabel})${pnlText}`;
+  });
+  return `📋 <b>Resumen diario</b>\n${lines.join("\n")}`;
 }
 
 async function runMarketCheck(env: Env): Promise<void> {
@@ -166,11 +233,32 @@ async function runMarketCheck(env: Env): Promise<void> {
     return;
   }
 
+  const pendingAlerts = await loadPriceAlerts(env);
+  const firedIds: string[] = [];
+  const summaries: PairSummary[] = [];
+
   for (const pair of Object.keys(PAIR_LABELS) as Pair[]) {
     try {
-      await checkPair(env, pair, positions);
+      const { summary, firedAlertIds } = await checkPair(env, pair, positions, pendingAlerts);
+      summaries.push(summary);
+      firedIds.push(...firedAlertIds);
     } catch (err) {
       console.error(`Error checking ${pair}:`, err);
+    }
+  }
+
+  if (firedIds.length > 0) {
+    await savePriceAlerts(env, pendingAlerts.filter((a) => !firedIds.includes(a.id)));
+  }
+
+  const now = new Date();
+  if (now.getUTCHours() === DIGEST_HOUR_UTC && summaries.length > 0) {
+    const todayStr = now.toISOString().slice(0, 10);
+    const digestStored = await env.MONITOR_STATE.get(DIGEST_KEY);
+    const lastDigestDate = digestStored ? JSON.parse(digestStored).lastDate : null;
+    if (lastDigestDate !== todayStr) {
+      await sendTelegram(env, buildDigestText(summaries));
+      await env.MONITOR_STATE.put(DIGEST_KEY, JSON.stringify({ lastDate: todayStr }));
     }
   }
 }
@@ -184,9 +272,54 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
     return new Response("ok");
   }
 
+  const text = msg.text.trim();
+
+  // Price alerts live in KV, not in positions.json, so they're handled here rather
+  // than in telegramCommands.ts (which only knows about position state).
+  if (/^\/?alertas(@|$|\s)/i.test(text)) {
+    const alerts = await loadPriceAlerts(env);
+    const reply =
+      alerts.length === 0
+        ? "No tenés alertas de precio pendientes."
+        : alerts.map((a) => `${PAIR_LABELS[a.pair]}: $${fmt(a.targetPrice)}`).join("\n");
+    await sendTelegram(env, reply);
+    return new Response("ok");
+  }
+
+  if (/^\/?alerta(@\S+)?(\s|$)/i.test(text)) {
+    const parts = text.split(/\s+/);
+    const pair = normalizePair(parts[1]);
+    const targetPrice = Number(parts[2]);
+    if (!pair || !targetPrice) {
+      await sendTelegram(env, "No entendí. Uso: /alerta BTC 68000");
+      return new Response("ok");
+    }
+
+    try {
+      const candles = await fetchDailyKlines(pair, 1);
+      const currentPrice = candles[candles.length - 1].close;
+      const alerts = await loadPriceAlerts(env);
+      alerts.push({
+        id: crypto.randomUUID(),
+        pair,
+        targetPrice,
+        side: sideOf(currentPrice, targetPrice),
+      });
+      await savePriceAlerts(env, alerts);
+      await sendTelegram(
+        env,
+        `🔔 Alerta creada: ${PAIR_LABELS[pair]} @ $${fmt(targetPrice)} (precio actual: $${currentPrice.toFixed(2)})`,
+      );
+    } catch (err) {
+      console.error("Error creating price alert:", err);
+      await sendTelegram(env, "No pude crear la alerta, intentá de nuevo en un rato.");
+    }
+    return new Response("ok");
+  }
+
   // /posicion wants a live PnL%, which needs the current price — skip the extra
   // Kraken calls for commands that don't need it (comprar/vender/reset).
-  const isPositionQuery = /^\/?(posicion|position|status)(@|$|\s)/i.test(msg.text.trim());
+  const isPositionQuery = /^\/?(posicion|position|status)(@|$|\s)/i.test(text);
   let prices: Partial<Record<Pair, number>> | undefined;
   if (isPositionQuery) {
     prices = {};
@@ -201,7 +334,7 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
   }
 
   const { positions, sha } = await readPositions(env);
-  const result = handleTelegramCommand(msg.text, positions, prices);
+  const result = handleTelegramCommand(text, positions, prices);
 
   if (result.changed) {
     await putGitHubFile(
