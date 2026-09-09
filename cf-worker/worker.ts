@@ -22,6 +22,7 @@ const POSITIONS_PATH = "monitor/positions.json";
 
 interface PairAlertState {
   lastVerdict: string | null;
+  lastNotifiedBuyScore: number | null;
   stopLossAlerted: boolean;
   takeProfitAlerted: boolean;
   technicalSellAlerted: boolean;
@@ -30,11 +31,17 @@ interface PairAlertState {
 
 const EMPTY_STATE: PairAlertState = {
   lastVerdict: null,
+  lastNotifiedBuyScore: null,
   stopLossAlerted: false,
   takeProfitAlerted: false,
   technicalSellAlerted: false,
   trendBreakAlerted: false,
 };
+
+// How many extra points the buy score needs to gain (while still in the green
+// zone) before re-notifying — e.g. price kept dropping toward support, a better
+// entry than the one you were already told about.
+const BUY_SCORE_IMPROVEMENT_THRESHOLD = 15;
 
 function githubConfig(env: Env): GitHubRepoConfig {
   return { token: env.GITHUB_TOKEN, owner: env.GITHUB_OWNER, repo: env.GITHUB_REPO };
@@ -60,7 +67,7 @@ async function readPositions(env: Env): Promise<{ positions: PositionsFile; sha?
 // and re-arms once it clears — so a real trigger always gets a fresh alert.
 async function handleAlert(
   state: PairAlertState,
-  flagKey: keyof Omit<PairAlertState, "lastVerdict">,
+  flagKey: keyof Omit<PairAlertState, "lastVerdict" | "lastNotifiedBuyScore">,
   isActive: boolean,
   notify: () => Promise<void>,
 ): Promise<void> {
@@ -79,17 +86,32 @@ async function checkPair(env: Env, pair: Pair, positions: PositionsFile): Promis
   const buyResult = buildBuyChecklist(ind);
 
   const stored = await env.MONITOR_STATE.get(pair);
-  const state: PairAlertState = stored ? JSON.parse(stored) : { ...EMPTY_STATE };
+  const state: PairAlertState = { ...EMPTY_STATE, ...(stored ? JSON.parse(stored) : {}) };
 
-  if (buyResult.verdict === "buy" && state.lastVerdict !== "buy") {
-    const passed = buyResult.items.filter((i) => i.passed).map((i) => `• ${i.label}`);
-    await sendTelegram(
-      env,
-      `🟢 <b>${label} entró en zona de compra</b>\n` +
-        `Score: ${buyResult.score}/${buyResult.maxScore}\n` +
-        `Precio: $${ind.price.toFixed(2)}\n\n` +
-        `Cumple:\n${passed.join("\n")}`,
-    );
+  if (buyResult.verdict === "buy") {
+    const enteredNow = state.lastVerdict !== "buy";
+    const improvedEnough =
+      !enteredNow &&
+      state.lastNotifiedBuyScore !== null &&
+      buyResult.score >= state.lastNotifiedBuyScore + BUY_SCORE_IMPROVEMENT_THRESHOLD;
+
+    if (enteredNow || improvedEnough) {
+      const passed = buyResult.items.filter((i) => i.passed).map((i) => `• ${i.label}`);
+      const heading = enteredNow
+        ? `🟢 <b>${label} entró en zona de compra</b>`
+        : `🟢📈 <b>${label} mejoró la zona de compra</b>\n(antes ${state.lastNotifiedBuyScore}/${buyResult.maxScore})`;
+      await sendTelegram(
+        env,
+        `${heading}\n` +
+          `Score: ${buyResult.score}/${buyResult.maxScore}\n` +
+          `Precio: $${ind.price.toFixed(2)}\n\n` +
+          `Cumple:\n${passed.join("\n")}`,
+      );
+      state.lastNotifiedBuyScore = buyResult.score;
+    }
+  } else {
+    // Reset so the next time it re-enters the green zone starts a fresh comparison.
+    state.lastNotifiedBuyScore = null;
   }
   state.lastVerdict = buyResult.verdict;
 
