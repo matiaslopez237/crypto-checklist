@@ -6,6 +6,15 @@ import { computeIndicators } from "../src/lib/indicators";
 import { buildBuyChecklist, buildSellChecklist } from "../src/lib/checklist";
 import { getGitHubFile, putGitHubFile, type GitHubRepoConfig } from "../src/lib/githubContents";
 import { handleTelegramCommand, normalizePair, fmt, PAIR_LABELS, type PositionsFile } from "../src/lib/telegramCommands";
+import {
+  applyPaperBuy,
+  applyPaperSell,
+  buildPaperSummary,
+  emptyPaperPortfolio,
+  emptyPaperPosition,
+  PAPER_THRESHOLDS,
+  type PaperPortfolio,
+} from "../src/lib/paperTrading";
 import type { Pair } from "../src/lib/types";
 
 export interface Env {
@@ -19,6 +28,7 @@ export interface Env {
 }
 
 const POSITIONS_PATH = "monitor/positions.json";
+const PAPER_TRADING_PATH = "monitor/paper-trading.json";
 
 interface PairAlertState {
   lastVerdict: string | null;
@@ -96,6 +106,21 @@ async function readPositions(env: Env): Promise<{ positions: PositionsFile; sha?
   return file ? { positions: JSON.parse(file.content), sha: file.sha } : { positions: {} };
 }
 
+async function readPaperPortfolio(env: Env): Promise<{ portfolio: PaperPortfolio; sha?: string }> {
+  const file = await getGitHubFile(githubConfig(env), PAPER_TRADING_PATH);
+  return file ? { portfolio: JSON.parse(file.content), sha: file.sha } : { portfolio: emptyPaperPortfolio() };
+}
+
+async function writePaperPortfolio(env: Env, portfolio: PaperPortfolio, sha: string | undefined): Promise<void> {
+  await putGitHubFile(
+    githubConfig(env),
+    PAPER_TRADING_PATH,
+    JSON.stringify(portfolio, null, 2) + "\n",
+    sha,
+    "chore: actualizar simulacion de papel",
+  );
+}
+
 // Notifies once when a condition turns true, stays quiet while it remains true,
 // and re-arms once it clears — so a real trigger always gets a fresh alert.
 async function handleAlert(
@@ -112,11 +137,24 @@ async function handleAlert(
   }
 }
 
+// Same on/off-with-rearm pattern as handleAlert, but for the paper position's own
+// dedup flags — kept separate since PaperPosition mixes booleans with numeric fields.
+function markIfActive(
+  pos: { stopLossAlerted: boolean; takeProfitAlerted: boolean; technicalSellAlerted: boolean; trendBreakAlerted: boolean },
+  flagKey: "stopLossAlerted" | "takeProfitAlerted" | "technicalSellAlerted" | "trendBreakAlerted",
+  isActive: boolean,
+): boolean {
+  const shouldFire = isActive && !pos[flagKey];
+  pos[flagKey] = isActive;
+  return shouldFire;
+}
+
 async function checkPair(
   env: Env,
   pair: Pair,
   positions: PositionsFile,
   priceAlerts: PriceAlert[],
+  paperPortfolio: PaperPortfolio,
 ): Promise<{ summary: PairSummary; firedAlertIds: string[] }> {
   const label = PAIR_LABELS[pair];
   const candles = await fetchDailyKlines(pair, 210);
@@ -139,12 +177,17 @@ async function checkPair(
   const stored = await env.MONITOR_STATE.get(pair);
   const state: PairAlertState = { ...EMPTY_STATE, ...(stored ? JSON.parse(stored) : {}) };
 
+  let enteredBuyZoneNow = false;
+  let buyZoneImprovedEnough = false;
   if (buyResult.verdict === "buy") {
     const enteredNow = state.lastVerdict !== "buy";
     const improvedEnough =
       !enteredNow &&
       state.lastNotifiedBuyScore !== null &&
       buyResult.score >= state.lastNotifiedBuyScore + BUY_SCORE_IMPROVEMENT_THRESHOLD;
+
+    enteredBuyZoneNow = enteredNow;
+    buyZoneImprovedEnough = improvedEnough;
 
     if (enteredNow || improvedEnough) {
       const passed = buyResult.items.filter((i) => i.passed).map((i) => `• ${i.label}`);
@@ -207,6 +250,44 @@ async function checkPair(
     );
   }
 
+  // Paper trading: act on the exact same signals as above, but against a separate
+  // fake portfolio and never via Telegram — purely for backtesting the strategy.
+  if (enteredBuyZoneNow || buyZoneImprovedEnough) {
+    applyPaperBuy(paperPortfolio, pair, ind.price, enteredBuyZoneNow ? "entrada en zona de compra" : "mejora de zona de compra");
+  }
+
+  const paperPos = paperPortfolio.positions[pair];
+  if (paperPos && paperPos.qty > 0 && paperPos.avgBuyPrice) {
+    const paperSell = buildSellChecklist(
+      ind,
+      paperPos.avgBuyPrice,
+      PAPER_THRESHOLDS.stopLossPct,
+      PAPER_THRESHOLDS.feePct,
+      PAPER_THRESHOLDS.takeProfitPct,
+    );
+
+    // Stop loss is the hard rule (full exit, matches the real checklist's philosophy).
+    // The softer signals share one combined sell using the same suggestedSellPct shown
+    // to the user, fired once whenever a new one of them joins (not re-fired while
+    // the same set stays active).
+    const stopLossNew = markIfActive(paperPos, "stopLossAlerted", paperSell.stopLoss.passed);
+    const takeProfitNew = markIfActive(paperPos, "takeProfitAlerted", paperSell.takeProfit.passed);
+    const technicalNew = markIfActive(paperPos, "technicalSellAlerted", paperSell.overbought.passed && paperSell.nearResistance.passed);
+    const trendBreakNew = markIfActive(paperPos, "trendBreakAlerted", paperSell.trendBreak.passed);
+
+    if (stopLossNew) {
+      applyPaperSell(paperPortfolio, pair, ind.price, 100, "stop loss");
+    } else if ((takeProfitNew || technicalNew || trendBreakNew) && paperSell.suggestedSellPct > 0) {
+      const reasons = [takeProfitNew && "take profit", technicalNew && "señal técnica", trendBreakNew && "ruptura de tendencia"]
+        .filter(Boolean)
+        .join(" + ");
+      applyPaperSell(paperPortfolio, pair, ind.price, paperSell.suggestedSellPct, reasons);
+    }
+  } else if (paperPortfolio.positions[pair]) {
+    // Position fully closed out — reset dedup flags so a future re-entry starts clean.
+    paperPortfolio.positions[pair] = emptyPaperPosition();
+  }
+
   await env.MONITOR_STATE.put(pair, JSON.stringify(state));
 
   return {
@@ -234,17 +315,23 @@ async function runMarketCheck(env: Env): Promise<void> {
   }
 
   const pendingAlerts = await loadPriceAlerts(env);
+  const { portfolio: paperPortfolio, sha: paperSha } = await readPaperPortfolio(env);
+  const tradesBefore = paperPortfolio.trades.length;
   const firedIds: string[] = [];
   const summaries: PairSummary[] = [];
 
   for (const pair of Object.keys(PAIR_LABELS) as Pair[]) {
     try {
-      const { summary, firedAlertIds } = await checkPair(env, pair, positions, pendingAlerts);
+      const { summary, firedAlertIds } = await checkPair(env, pair, positions, pendingAlerts, paperPortfolio);
       summaries.push(summary);
       firedIds.push(...firedAlertIds);
     } catch (err) {
       console.error(`Error checking ${pair}:`, err);
     }
+  }
+
+  if (paperPortfolio.trades.length > tradesBefore) {
+    await writePaperPortfolio(env, paperPortfolio, paperSha);
   }
 
   if (firedIds.length > 0) {
@@ -273,6 +360,21 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
   }
 
   const text = msg.text.trim();
+
+  if (/^\/?papel(@|$|\s)/i.test(text)) {
+    const { portfolio } = await readPaperPortfolio(env);
+    const prices: Partial<Record<Pair, number>> = {};
+    for (const pair of Object.keys(PAIR_LABELS) as Pair[]) {
+      try {
+        const candles = await fetchDailyKlines(pair, 1);
+        prices[pair] = candles[candles.length - 1].close;
+      } catch (err) {
+        console.error(`Error fetching price for ${pair}:`, err);
+      }
+    }
+    await sendTelegram(env, buildPaperSummary(portfolio, prices));
+    return new Response("ok");
+  }
 
   // Price alerts live in KV, not in positions.json, so they're handled here rather
   // than in telegramCommands.ts (which only knows about position state).

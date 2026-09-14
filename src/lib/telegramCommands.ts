@@ -21,7 +21,8 @@ const HELP_TEXT =
   "/posicion — muestra tu posición actual\n" +
   "/reset BTC — limpia la posición de ese par\n" +
   "/alerta BTC 68000 — avisa una vez cuando el precio cruce ese nivel\n" +
-  "/alertas — lista tus alertas de precio pendientes";
+  "/alertas — lista tus alertas de precio pendientes\n" +
+  "/papel — muestra cómo le va a la simulación con plata ficticia";
 
 export function normalizePair(raw: string | undefined): Pair | null {
   return raw ? (PAIR_ALIASES[raw.toUpperCase()] ?? null) : null;
