@@ -12,7 +12,7 @@ export type PositionsFile = Partial<Record<Pair, StoredPosition>>;
 
 const PAIR_ALIASES: Record<string, Pair> = { BTC: "BTCUSDT", BTCUSDT: "BTCUSDT", ETH: "ETHUSDT", ETHUSDT: "ETHUSDT" };
 export const PAIR_LABELS: Record<Pair, string> = { BTCUSDT: "BTC/USDT", ETHUSDT: "ETH/USDT" };
-const DEFAULT_THRESHOLDS = { stopLossPct: 10, takeProfitPct: 20, feePct: 0.1 };
+const DEFAULT_THRESHOLDS = { stopLossPct: 10, takeProfitPct: 3, feePct: 0.1 };
 
 const HELP_TEXT =
   "Comandos disponibles:\n" +
