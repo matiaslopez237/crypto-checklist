@@ -176,6 +176,7 @@ async function checkPair(
 
   const stored = await env.MONITOR_STATE.get(pair);
   const state: PairAlertState = { ...EMPTY_STATE, ...(stored ? JSON.parse(stored) : {}) };
+  const stateBefore = JSON.stringify(state);
 
   let enteredBuyZoneNow = false;
   let buyZoneImprovedEnough = false;
@@ -288,7 +289,13 @@ async function checkPair(
     paperPortfolio.positions[pair] = emptyPaperPosition();
   }
 
-  await env.MONITOR_STATE.put(pair, JSON.stringify(state));
+  // Skip the write entirely when nothing actually changed — at a 5-minute cron,
+  // writing every run regardless would burn through the KV free tier's daily
+  // write cap in a matter of hours (confirmed: this was the bug).
+  const stateAfter = JSON.stringify(state);
+  if (stateAfter !== stateBefore) {
+    await env.MONITOR_STATE.put(pair, stateAfter);
+  }
 
   return {
     summary: { label, price: ind.price, score: buyResult.score, maxScore: buyResult.maxScore, verdict: buyResult.verdict, pnlPct },
