@@ -1,11 +1,11 @@
 {
-  "cashUsdt": 6.144,
+  "cashUsdt": 10.716580183518222,
   "positions": {
     "ETHUSDT": {
-      "qty": 0.003563766875294289,
+      "qty": 0.0017818834376471446,
       "avgBuyPrice": 2485.011031836556,
       "stopLossAlerted": false,
-      "takeProfitAlerted": false,
+      "takeProfitAlerted": true,
       "technicalSellAlerted": false,
       "trendBreakAlerted": false
     }
@@ -42,6 +42,14 @@
       "price": 2485.05,
       "amountUsdt": 1.536,
       "reason": "entrada en zona de compra"
+    },
+    {
+      "date": "2026-09-18T13:51:31.688Z",
+      "pair": "ETHUSDT",
+      "side": "sell",
+      "price": 2566.15,
+      "amountUsdt": 4.5725801835182205,
+      "reason": "take profit"
     }
   ]
 }
