@@ -48,10 +48,12 @@ export function applyPaperBuy(portfolio: PaperPortfolio, pair: Pair, price: numb
 
   const existing = portfolio.positions[pair] ?? emptyPaperPosition();
   const existingCost = existing.avgBuyPrice ? existing.qty * existing.avgBuyPrice : 0;
-  const newQty = amountUsdt / price;
+  // Exchange fee comes out of what was spent, so fewer units are received. avgBuyPrice
+  // stays the raw execution price (the net-PnL formula adds the entry fee itself).
+  const newQty = (amountUsdt * (1 - PAPER_THRESHOLDS.feePct / 100)) / price;
   const totalQty = existing.qty + newQty;
 
-  portfolio.positions[pair] = { ...existing, qty: totalQty, avgBuyPrice: (existingCost + amountUsdt) / totalQty };
+  portfolio.positions[pair] = { ...existing, qty: totalQty, avgBuyPrice: (existingCost + newQty * price) / totalQty };
   portfolio.cashUsdt -= amountUsdt;
   portfolio.trades.push({ date: new Date().toISOString(), pair, side: "buy", price, amountUsdt, reason });
 }
@@ -61,7 +63,7 @@ export function applyPaperSell(portfolio: PaperPortfolio, pair: Pair, price: num
   if (!pos || pos.qty <= 0) return;
 
   const qtyToSell = pos.qty * (sellPct / 100);
-  const proceeds = qtyToSell * price;
+  const proceeds = qtyToSell * price * (1 - PAPER_THRESHOLDS.feePct / 100);
   const newQty = pos.qty - qtyToSell;
 
   portfolio.positions[pair] = { ...pos, qty: newQty, avgBuyPrice: newQty > 1e-12 ? pos.avgBuyPrice : null };

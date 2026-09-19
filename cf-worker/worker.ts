@@ -15,7 +15,7 @@ import {
   PAPER_THRESHOLDS,
   type PaperPortfolio,
 } from "../src/lib/paperTrading";
-import type { Pair } from "../src/lib/types";
+import type { Indicators, Pair } from "../src/lib/types";
 
 export interface Env {
   TELEGRAM_BOT_TOKEN: string;
@@ -52,6 +52,25 @@ const EMPTY_STATE: PairAlertState = {
 // zone) before re-notifying — e.g. price kept dropping toward support, a better
 // entry than the one you were already told about.
 const BUY_SCORE_IMPROVEMENT_THRESHOLD = 15;
+
+// Hysteresis ("colchon"): an alert only re-arms once the condition has backed off
+// well past its trigger, not the instant it dips one tick below. Without this, a price
+// hovering right at a threshold (e.g. 3% take profit) flips the flag on/off every few
+// minutes and re-sends the same alert each time.
+const REARM_MARGIN_PCT = 1;
+// Buy zone starts at score 75; it only counts as "left" below this, so a single
+// criterion toggling (e.g. "near support", worth 20 pts) doesn't re-fire the entry alert.
+const BUY_ZONE_EXIT_SCORE = 65;
+
+function rearmConditions(ind: Indicators, pnlPct: number, stopLossPct: number, takeProfitPct: number) {
+  const distToResistance = ((ind.resistance20 - ind.price) / ind.resistance20) * 100;
+  return {
+    stopLoss: pnlPct > -stopLossPct + REARM_MARGIN_PCT,
+    takeProfit: pnlPct < takeProfitPct - REARM_MARGIN_PCT,
+    technical: ind.rsi14 === null || ind.rsi14 < 65 || distToResistance > 3,
+    trendBreak: ind.sma50 === null || ind.price > ind.sma50 * 1.01,
+  };
+}
 
 interface PriceAlert {
   id: string;
@@ -128,11 +147,12 @@ async function handleAlert(
   flagKey: keyof Omit<PairAlertState, "lastVerdict" | "lastNotifiedBuyScore">,
   isActive: boolean,
   notify: () => Promise<void>,
+  clearWhen: boolean = !isActive, // must imply !isActive; wider than it = hysteresis band
 ): Promise<void> {
   if (isActive && !state[flagKey]) {
     await notify();
     state[flagKey] = true;
-  } else if (!isActive) {
+  } else if (clearWhen) {
     state[flagKey] = false;
   }
 }
@@ -143,9 +163,11 @@ function markIfActive(
   pos: { stopLossAlerted: boolean; takeProfitAlerted: boolean; technicalSellAlerted: boolean; trendBreakAlerted: boolean },
   flagKey: "stopLossAlerted" | "takeProfitAlerted" | "technicalSellAlerted" | "trendBreakAlerted",
   isActive: boolean,
+  clearWhen: boolean = !isActive, // must imply !isActive; wider than it = hysteresis band
 ): boolean {
   const shouldFire = isActive && !pos[flagKey];
-  pos[flagKey] = isActive;
+  if (isActive) pos[flagKey] = true;
+  else if (clearWhen) pos[flagKey] = false;
   return shouldFire;
 }
 
@@ -204,11 +226,17 @@ async function checkPair(
       );
       state.lastNotifiedBuyScore = buyResult.score;
     }
-  } else {
+  }
+
+  // A verdict slipping just under 75 doesn't count as leaving the zone until the score
+  // falls below BUY_ZONE_EXIT_SCORE, so a criterion flickering at its edge can't re-fire
+  // the entry alert (or a paper buy) every few minutes.
+  const stillInBuyZone = state.lastVerdict === "buy" && buyResult.score >= BUY_ZONE_EXIT_SCORE;
+  if (buyResult.verdict !== "buy" && !stillInBuyZone) {
     // Reset so the next time it re-enters the green zone starts a fresh comparison.
     state.lastNotifiedBuyScore = null;
   }
-  state.lastVerdict = buyResult.verdict;
+  state.lastVerdict = buyResult.verdict === "buy" || stillInBuyZone ? "buy" : buyResult.verdict;
 
   let pnlPct: number | null = null;
   const pos = positions[pair];
@@ -217,37 +245,57 @@ async function checkPair(
     const sellResult = buildSellChecklist(ind, avgBuyPrice, pos.stopLossPct, pos.feePct, pos.takeProfitPct);
     pnlPct = sellResult.pnlPct;
     const suggestion = sellResult.suggestedSellPct > 0 ? `\n\n💡 Sugerencia: vender ${sellResult.suggestedSellPct}%` : "";
+    const rearm = rearmConditions(ind, sellResult.pnlPct, pos.stopLossPct, pos.takeProfitPct);
 
-    await handleAlert(state, "stopLossAlerted", sellResult.stopLoss.passed, () =>
-      sendTelegram(
-        env,
-        `🔴 <b>${label}: alerta de stop loss</b>\n` +
-          `PnL neto: ${sellResult.pnlPct.toFixed(1)}% (límite -${pos.stopLossPct}%)\n` +
-          `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${avgBuyPrice.toFixed(2)}${suggestion}`,
-      ),
+    await handleAlert(
+      state,
+      "stopLossAlerted",
+      sellResult.stopLoss.passed,
+      () =>
+        sendTelegram(
+          env,
+          `🔴 <b>${label}: alerta de stop loss</b>\n` +
+            `PnL neto: ${sellResult.pnlPct.toFixed(1)}% (límite -${pos.stopLossPct}%)\n` +
+            `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${avgBuyPrice.toFixed(2)}${suggestion}`,
+        ),
+      rearm.stopLoss,
     );
 
-    await handleAlert(state, "takeProfitAlerted", sellResult.takeProfit.passed, () =>
-      sendTelegram(
-        env,
-        `🟡 <b>${label}: objetivo de ganancia alcanzado</b>\n` +
-          `PnL neto: +${sellResult.pnlPct.toFixed(1)}% (objetivo +${pos.takeProfitPct}%)\n` +
-          `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${avgBuyPrice.toFixed(2)}${suggestion}`,
-      ),
+    await handleAlert(
+      state,
+      "takeProfitAlerted",
+      sellResult.takeProfit.passed,
+      () =>
+        sendTelegram(
+          env,
+          `🟡 <b>${label}: objetivo de ganancia alcanzado</b>\n` +
+            `PnL neto: +${sellResult.pnlPct.toFixed(1)}% (objetivo +${pos.takeProfitPct}%)\n` +
+            `Precio: $${ind.price.toFixed(2)} · entrada promedio: $${avgBuyPrice.toFixed(2)}${suggestion}`,
+        ),
+      rearm.takeProfit,
     );
 
     const technicalSell = sellResult.overbought.passed && sellResult.nearResistance.passed;
-    await handleAlert(state, "technicalSellAlerted", technicalSell, () =>
-      sendTelegram(
-        env,
-        `🟠 <b>${label}: señal técnica de venta</b>\n` +
-          `RSI sobrecomprado y precio cerca de la resistencia de 20 días.\n` +
-          `${sellResult.overbought.detail} · ${sellResult.nearResistance.detail}${suggestion}`,
-      ),
+    await handleAlert(
+      state,
+      "technicalSellAlerted",
+      technicalSell,
+      () =>
+        sendTelegram(
+          env,
+          `🟠 <b>${label}: señal técnica de venta</b>\n` +
+            `RSI sobrecomprado y precio cerca de la resistencia de 20 días.\n` +
+            `${sellResult.overbought.detail} · ${sellResult.nearResistance.detail}${suggestion}`,
+        ),
+      rearm.technical,
     );
 
-    await handleAlert(state, "trendBreakAlerted", sellResult.trendBreak.passed, () =>
-      sendTelegram(env, `🟠 <b>${label}: ruptura de tendencia</b>\n${sellResult.trendBreak.detail}${suggestion}`),
+    await handleAlert(
+      state,
+      "trendBreakAlerted",
+      sellResult.trendBreak.passed,
+      () => sendTelegram(env, `🟠 <b>${label}: ruptura de tendencia</b>\n${sellResult.trendBreak.detail}${suggestion}`),
+      rearm.trendBreak,
     );
   }
 
@@ -271,10 +319,16 @@ async function checkPair(
     // The softer signals share one combined sell using the same suggestedSellPct shown
     // to the user, fired once whenever a new one of them joins (not re-fired while
     // the same set stays active).
-    const stopLossNew = markIfActive(paperPos, "stopLossAlerted", paperSell.stopLoss.passed);
-    const takeProfitNew = markIfActive(paperPos, "takeProfitAlerted", paperSell.takeProfit.passed);
-    const technicalNew = markIfActive(paperPos, "technicalSellAlerted", paperSell.overbought.passed && paperSell.nearResistance.passed);
-    const trendBreakNew = markIfActive(paperPos, "trendBreakAlerted", paperSell.trendBreak.passed);
+    const paperRearm = rearmConditions(ind, paperSell.pnlPct, PAPER_THRESHOLDS.stopLossPct, PAPER_THRESHOLDS.takeProfitPct);
+    const stopLossNew = markIfActive(paperPos, "stopLossAlerted", paperSell.stopLoss.passed, paperRearm.stopLoss);
+    const takeProfitNew = markIfActive(paperPos, "takeProfitAlerted", paperSell.takeProfit.passed, paperRearm.takeProfit);
+    const technicalNew = markIfActive(
+      paperPos,
+      "technicalSellAlerted",
+      paperSell.overbought.passed && paperSell.nearResistance.passed,
+      paperRearm.technical,
+    );
+    const trendBreakNew = markIfActive(paperPos, "trendBreakAlerted", paperSell.trendBreak.passed, paperRearm.trendBreak);
 
     if (stopLossNew) {
       applyPaperSell(paperPortfolio, pair, ind.price, 100, "stop loss");
