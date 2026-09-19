@@ -1,14 +1,14 @@
 {
   "BTCUSDT": {
-    "avgBuyPrice": 78402.84,
-    "qty": 0.00001289,
+    "avgBuyPrice": null,
+    "qty": 0,
     "stopLossPct": 10,
     "takeProfitPct": 3,
     "feePct": 0.1
   },
   "ETHUSDT": {
-    "avgBuyPrice": 2466.34,
-    "qty": 0.00153144,
+    "avgBuyPrice": null,
+    "qty": 0,
     "stopLossPct": 10,
     "takeProfitPct": 3,
     "feePct": 0.1
