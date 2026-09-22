@@ -3,7 +3,7 @@ main = "worker.ts"
 compatibility_date = "2026-09-01"
 
 [triggers]
-crons = ["*/5 * * * *"] # every 5 minutes
+crons = ["*/15 * * * *"] # every 15 minutes (was 5; spaced out to ease Kraken's rate limit)
 
 [vars]
 GITHUB_OWNER = "matiaslopez237"
