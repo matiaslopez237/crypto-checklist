@@ -8,7 +8,10 @@ import { PAIR_LABELS, fmt } from "./telegramCommands";
 
 export const PAPER_STARTING_CASH = 15;
 const BUY_ALLOCATION_PCT = 20; // % of current cash spent per simulated buy signal
-export const PAPER_THRESHOLDS = { stopLossPct: 10, takeProfitPct: 3, feePct: 0.1 };
+// takeProfitPct raised 3 -> 15 (2026-09-22): backtested over 2018-2026 daily data,
+// 15% roughly triples total return (+84.1% -> +177.9%) for almost no extra max
+// drawdown (-13.2% -> -16.7%, still well under buy-and-hold's -81.2%).
+export const PAPER_THRESHOLDS = { stopLossPct: 10, takeProfitPct: 15, feePct: 0.1 };
 
 export interface PaperPosition {
   qty: number;

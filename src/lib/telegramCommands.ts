@@ -12,7 +12,8 @@ export type PositionsFile = Partial<Record<Pair, StoredPosition>>;
 
 const PAIR_ALIASES: Record<string, Pair> = { BTC: "BTCUSDT", BTCUSDT: "BTCUSDT", ETH: "ETHUSDT", ETHUSDT: "ETHUSDT" };
 export const PAIR_LABELS: Record<Pair, string> = { BTCUSDT: "BTC/USDT", ETHUSDT: "ETH/USDT" };
-const DEFAULT_THRESHOLDS = { stopLossPct: 10, takeProfitPct: 3, feePct: 0.1 };
+// takeProfitPct raised 3 -> 15 (2026-09-22), same backtest-driven change as PAPER_THRESHOLDS in paperTrading.ts.
+const DEFAULT_THRESHOLDS = { stopLossPct: 10, takeProfitPct: 15, feePct: 0.1 };
 
 const HELP_TEXT =
   "Comandos disponibles:\n" +

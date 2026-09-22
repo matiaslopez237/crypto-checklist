@@ -20,6 +20,10 @@ import { getHistory } from "./binanceHistory";
 const PAIRS: Pair[] = ["BTCUSDT", "ETHUSDT"];
 const WINDOW = 210; // same rolling window the live Worker feeds computeIndicators
 
+// Override the paper-trading take-profit for experimentation without touching
+// production: TAKE_PROFIT_PCT=6 npx tsx scripts/backtest-spot.ts
+const THRESHOLDS = { ...PAPER_THRESHOLDS, takeProfitPct: process.env.TAKE_PROFIT_PCT ? Number(process.env.TAKE_PROFIT_PCT) : PAPER_THRESHOLDS.takeProfitPct };
+
 interface TradeRecord {
   date: string;
   pair: Pair;
@@ -89,8 +93,8 @@ async function main() {
 
       const paperPos = portfolio.positions[pair];
       if (paperPos && paperPos.qty > 0 && paperPos.avgBuyPrice) {
-        const paperSell = buildSellChecklist(ind, paperPos.avgBuyPrice, PAPER_THRESHOLDS.stopLossPct, PAPER_THRESHOLDS.feePct, PAPER_THRESHOLDS.takeProfitPct);
-        const paperRearm = rearmConditions(ind, paperSell.pnlPct, PAPER_THRESHOLDS.stopLossPct, PAPER_THRESHOLDS.takeProfitPct);
+        const paperSell = buildSellChecklist(ind, paperPos.avgBuyPrice, THRESHOLDS.stopLossPct, THRESHOLDS.feePct, THRESHOLDS.takeProfitPct);
+        const paperRearm = rearmConditions(ind, paperSell.pnlPct, THRESHOLDS.stopLossPct, THRESHOLDS.takeProfitPct);
         const stopLossNew = markIfActive(paperPos, "stopLossAlerted", paperSell.stopLoss.passed, paperRearm.stopLoss);
         const takeProfitNew = markIfActive(paperPos, "takeProfitAlerted", paperSell.takeProfit.passed, paperRearm.takeProfit);
         const technicalNew = markIfActive(paperPos, "technicalSellAlerted", paperSell.overbought.passed && paperSell.nearResistance.passed, paperRearm.technical);
