@@ -7,7 +7,7 @@ import { PAIR_LABELS, fmt } from "./telegramCommands";
 // notifies Telegram — purely recorded for later review via /papel.
 
 export const PAPER_STARTING_CASH = 15;
-const BUY_ALLOCATION_PCT = 20; // % of current cash spent per simulated buy signal
+export const BUY_ALLOCATION_PCT = 20; // % of current cash spent per simulated buy signal
 // takeProfitPct raised 3 -> 15 (2026-09-22): backtested over 2018-2026 daily data,
 // 15% roughly triples total return (+84.1% -> +177.9%) for almost no extra max
 // drawdown (-13.2% -> -16.7%, still well under buy-and-hold's -81.2%).
@@ -45,8 +45,8 @@ export function emptyPaperPortfolio(): PaperPortfolio {
   return { cashUsdt: PAPER_STARTING_CASH, positions: {}, trades: [] };
 }
 
-export function applyPaperBuy(portfolio: PaperPortfolio, pair: Pair, price: number, reason: string): void {
-  const amountUsdt = portfolio.cashUsdt * (BUY_ALLOCATION_PCT / 100);
+export function applyPaperBuy(portfolio: PaperPortfolio, pair: Pair, price: number, reason: string, allocationPct = BUY_ALLOCATION_PCT): void {
+  const amountUsdt = portfolio.cashUsdt * (allocationPct / 100);
   if (amountUsdt < 1) return; // not enough fake cash left to bother
 
   const existing = portfolio.positions[pair] ?? emptyPaperPosition();

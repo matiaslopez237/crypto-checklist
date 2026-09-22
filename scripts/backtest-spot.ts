@@ -3,13 +3,28 @@
 // years of real daily candles instead of live 5/15-minute cron ticks. Run with:
 //   npx tsx scripts/backtest-spot.ts
 import { computeIndicators } from "../src/lib/indicators";
-import { buildBuyChecklist, buildSellChecklist } from "../src/lib/checklist";
-import { evaluateBuyZone, markIfActive, rearmConditions, type BuyZoneState } from "../src/lib/spotStrategy";
+import {
+  buildBuyChecklist,
+  buildSellChecklist,
+  DEFAULT_NEAR_RESISTANCE_PCT,
+  DEFAULT_OVERBOUGHT_RSI_THRESHOLD,
+  type BuyChecklistConfig,
+} from "../src/lib/checklist";
+import {
+  evaluateBuyZone,
+  markIfActive,
+  rearmConditions,
+  BUY_SCORE_IMPROVEMENT_THRESHOLD,
+  BUY_ZONE_EXIT_SCORE,
+  REARM_MARGIN_PCT,
+  type BuyZoneState,
+} from "../src/lib/spotStrategy";
 import {
   applyPaperBuy,
   applyPaperSell,
   emptyPaperPortfolio,
   emptyPaperPosition,
+  BUY_ALLOCATION_PCT,
   PAPER_STARTING_CASH,
   PAPER_THRESHOLDS,
   type PaperPortfolio,
@@ -20,9 +35,43 @@ import { getHistory } from "./binanceHistory";
 const PAIRS: Pair[] = ["BTCUSDT", "ETHUSDT"];
 const WINDOW = 210; // same rolling window the live Worker feeds computeIndicators
 
-// Override the paper-trading take-profit for experimentation without touching
-// production: TAKE_PROFIT_PCT=6 npx tsx scripts/backtest-spot.ts
-const THRESHOLDS = { ...PAPER_THRESHOLDS, takeProfitPct: process.env.TAKE_PROFIT_PCT ? Number(process.env.TAKE_PROFIT_PCT) : PAPER_THRESHOLDS.takeProfitPct };
+// Every factor overridable by env var for one-at-a-time sweeps, without touching
+// production defaults: e.g. TAKE_PROFIT_PCT=6 npx tsx scripts/backtest-spot.ts
+// Falls back to the actual production constant (imported, never re-typed here) so
+// this script can't silently drift out of sync with checklist.ts/spotStrategy.ts
+// the way it once did (its own hardcoded fallbacks went stale after a production
+// default changed).
+const envNum = (name: string, fallback: number) => (process.env[name] ? Number(process.env[name]) : fallback);
+// Like envNum, but returns undefined (instead of a fallback) when unset, so the key
+// can be left out of a Partial<> config entirely and the function's own default applies.
+const envNumOptional = (name: string): number | undefined => (process.env[name] !== undefined ? Number(process.env[name]) : undefined);
+function definedOnly<T extends object>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+const THRESHOLDS = {
+  ...PAPER_THRESHOLDS,
+  stopLossPct: envNum("STOP_LOSS_PCT", PAPER_THRESHOLDS.stopLossPct),
+  takeProfitPct: envNum("TAKE_PROFIT_PCT", PAPER_THRESHOLDS.takeProfitPct),
+};
+const SELL_OVERBOUGHT_RSI = envNum("SELL_OVERBOUGHT_RSI", DEFAULT_OVERBOUGHT_RSI_THRESHOLD);
+const NEAR_RESISTANCE_PCT = envNum("NEAR_RESISTANCE_PCT", DEFAULT_NEAR_RESISTANCE_PCT);
+const ALLOCATION_PCT = envNum("BUY_ALLOCATION_PCT", BUY_ALLOCATION_PCT);
+const SCORE_IMPROVEMENT = envNum("SCORE_IMPROVEMENT", BUY_SCORE_IMPROVEMENT_THRESHOLD);
+const ZONE_EXIT_SCORE = envNum("BUY_ZONE_EXIT_SCORE", BUY_ZONE_EXIT_SCORE);
+const REARM_MARGIN = envNum("REARM_MARGIN_PCT", REARM_MARGIN_PCT);
+
+const BUY_CONFIG: Partial<BuyChecklistConfig> = definedOnly({
+  longTermTrendCushion: envNumOptional("LONG_TERM_CUSHION"),
+  midTermTrendCushion: envNumOptional("MID_TERM_CUSHION"),
+  nearSupportPct: envNumOptional("NEAR_SUPPORT_PCT"),
+  rsiOverboughtThreshold: envNumOptional("RSI_OVERBOUGHT"),
+  notChasingPct: envNumOptional("NOT_CHASING_PCT"),
+  roomToResistancePct: envNumOptional("ROOM_TO_RESISTANCE_PCT"),
+  volumeConfirmationRatio: envNumOptional("VOLUME_RATIO"),
+  buyThresholdRatio: envNumOptional("BUY_THRESHOLD_RATIO"),
+  watchThresholdRatio: envNumOptional("WATCH_THRESHOLD_RATIO"),
+});
 
 interface TradeRecord {
   date: string;
@@ -81,20 +130,28 @@ async function main() {
   for (const date of commonDates) {
     for (const pair of PAIRS) {
       const ind = indicatorsByDate[pair].get(date)!;
-      const buyResult = buildBuyChecklist(ind);
+      const buyResult = buildBuyChecklist(ind, BUY_CONFIG);
       const state = states[pair];
 
-      const { enteredBuyZoneNow, buyZoneImprovedEnough } = evaluateBuyZone(state, buyResult);
+      const { enteredBuyZoneNow, buyZoneImprovedEnough } = evaluateBuyZone(state, buyResult, SCORE_IMPROVEMENT, ZONE_EXIT_SCORE);
       if (enteredBuyZoneNow || buyZoneImprovedEnough) {
         const cashBefore = portfolio.cashUsdt;
-        applyPaperBuy(portfolio, pair, ind.price, enteredBuyZoneNow ? "entrada en zona de compra" : "mejora de zona de compra");
+        applyPaperBuy(portfolio, pair, ind.price, enteredBuyZoneNow ? "entrada en zona de compra" : "mejora de zona de compra", ALLOCATION_PCT);
         if (portfolio.cashUsdt !== cashBefore) trades.push({ date, pair, side: "buy", price: ind.price, pnlPct: null, reason: enteredBuyZoneNow ? "entrada" : "mejora" });
       }
 
       const paperPos = portfolio.positions[pair];
       if (paperPos && paperPos.qty > 0 && paperPos.avgBuyPrice) {
-        const paperSell = buildSellChecklist(ind, paperPos.avgBuyPrice, THRESHOLDS.stopLossPct, THRESHOLDS.feePct, THRESHOLDS.takeProfitPct);
-        const paperRearm = rearmConditions(ind, paperSell.pnlPct, THRESHOLDS.stopLossPct, THRESHOLDS.takeProfitPct);
+        const paperSell = buildSellChecklist(
+          ind,
+          paperPos.avgBuyPrice,
+          THRESHOLDS.stopLossPct,
+          THRESHOLDS.feePct,
+          THRESHOLDS.takeProfitPct,
+          SELL_OVERBOUGHT_RSI,
+          NEAR_RESISTANCE_PCT,
+        );
+        const paperRearm = rearmConditions(ind, paperSell.pnlPct, THRESHOLDS.stopLossPct, THRESHOLDS.takeProfitPct, REARM_MARGIN);
         const stopLossNew = markIfActive(paperPos, "stopLossAlerted", paperSell.stopLoss.passed, paperRearm.stopLoss);
         const takeProfitNew = markIfActive(paperPos, "takeProfitAlerted", paperSell.takeProfit.passed, paperRearm.takeProfit);
         const technicalNew = markIfActive(paperPos, "technicalSellAlerted", paperSell.overbought.passed && paperSell.nearResistance.passed, paperRearm.technical);

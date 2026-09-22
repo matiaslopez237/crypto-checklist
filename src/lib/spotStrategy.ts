@@ -17,11 +17,17 @@ export const REARM_MARGIN_PCT = 1;
 // criterion toggling (e.g. "near support", worth 20 pts) doesn't re-fire the entry alert.
 export const BUY_ZONE_EXIT_SCORE = 65;
 
-export function rearmConditions(ind: Indicators, pnlPct: number, stopLossPct: number, takeProfitPct: number) {
+export function rearmConditions(
+  ind: Indicators,
+  pnlPct: number,
+  stopLossPct: number,
+  takeProfitPct: number,
+  rearmMarginPct = REARM_MARGIN_PCT,
+) {
   const distToResistance = ((ind.resistance20 - ind.price) / ind.resistance20) * 100;
   return {
-    stopLoss: pnlPct > -stopLossPct + REARM_MARGIN_PCT,
-    takeProfit: pnlPct < takeProfitPct - REARM_MARGIN_PCT,
+    stopLoss: pnlPct > -stopLossPct + rearmMarginPct,
+    takeProfit: pnlPct < takeProfitPct - rearmMarginPct,
     technical: ind.rsi14 === null || ind.rsi14 < 65 || distToResistance > 3,
     trendBreak: ind.sma50 === null || ind.price > ind.sma50 * 1.01,
   };
@@ -54,6 +60,8 @@ export interface BuyZoneState {
 export function evaluateBuyZone(
   state: BuyZoneState,
   buyResult: BuyChecklistResult,
+  scoreImprovementThreshold = BUY_SCORE_IMPROVEMENT_THRESHOLD,
+  buyZoneExitScore = BUY_ZONE_EXIT_SCORE,
 ): { enteredBuyZoneNow: boolean; buyZoneImprovedEnough: boolean } {
   let enteredBuyZoneNow = false;
   let buyZoneImprovedEnough = false;
@@ -61,7 +69,7 @@ export function evaluateBuyZone(
   if (buyResult.verdict === "buy") {
     const enteredNow = state.lastVerdict !== "buy";
     const improvedEnough =
-      !enteredNow && state.lastNotifiedBuyScore !== null && buyResult.score >= state.lastNotifiedBuyScore + BUY_SCORE_IMPROVEMENT_THRESHOLD;
+      !enteredNow && state.lastNotifiedBuyScore !== null && buyResult.score >= state.lastNotifiedBuyScore + scoreImprovementThreshold;
 
     enteredBuyZoneNow = enteredNow;
     buyZoneImprovedEnough = improvedEnough;
@@ -69,10 +77,10 @@ export function evaluateBuyZone(
     if (enteredNow || improvedEnough) state.lastNotifiedBuyScore = buyResult.score;
   }
 
-  // A verdict slipping just under 75 doesn't count as leaving the zone until the score
-  // falls below BUY_ZONE_EXIT_SCORE, so a criterion flickering at its edge can't re-fire
-  // the entry alert (or a paper buy) every few minutes.
-  const stillInBuyZone = state.lastVerdict === "buy" && buyResult.score >= BUY_ZONE_EXIT_SCORE;
+  // A verdict slipping just under the buy cutoff doesn't count as leaving the zone until
+  // the score falls below buyZoneExitScore, so a criterion flickering at its edge can't
+  // re-fire the entry alert (or a paper buy) every few minutes.
+  const stillInBuyZone = state.lastVerdict === "buy" && buyResult.score >= buyZoneExitScore;
   if (buyResult.verdict !== "buy" && !stillInBuyZone) {
     state.lastNotifiedBuyScore = null;
   }
