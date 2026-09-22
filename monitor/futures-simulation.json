@@ -1,19 +1,47 @@
 {
   "A-2x": {
-    "cash": 100,
-    "positions": {},
+    "cash": 85.71428571428572,
+    "positions": {
+      "SOLUSDT": {
+        "side": "long",
+        "entryPrice": 116.99,
+        "qty": 0.24422111780005618,
+        "qtyRemaining": 0.24422111780005618,
+        "margin": 14.285714285714285,
+        "marginRemaining": 14.285714285714285,
+        "leverage": 2,
+        "openedAt": "2026-09-22T14:30:27.323Z",
+        "partialTaken": false,
+        "bestPrice": 116.99,
+        "lastFundingAt": "2026-09-22T14:30:27.323Z"
+      }
+    },
     "trades": [],
     "dayStartEquity": 100,
-    "lastDay": "",
+    "lastDay": "2026-09-22",
     "paused": false,
     "blockedCount": 0
   },
   "B-2x": {
-    "cash": 100,
-    "positions": {},
+    "cash": 85.71428571428572,
+    "positions": {
+      "SOLUSDT": {
+        "side": "long",
+        "entryPrice": 116.99,
+        "qty": 0.24422111780005618,
+        "qtyRemaining": 0.24422111780005618,
+        "margin": 14.285714285714285,
+        "marginRemaining": 14.285714285714285,
+        "leverage": 2,
+        "openedAt": "2026-09-22T14:30:27.323Z",
+        "partialTaken": false,
+        "bestPrice": 116.99,
+        "lastFundingAt": "2026-09-22T14:30:27.323Z"
+      }
+    },
     "trades": [],
     "dayStartEquity": 100,
-    "lastDay": "",
+    "lastDay": "2026-09-22",
     "paused": false,
     "blockedCount": 0
   }
