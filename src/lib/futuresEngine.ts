@@ -17,14 +17,17 @@ import {
 // flipping the direction every few days). Same cushion + SMA50 confirmation the spot
 // buy checklist already uses (its "longTermTrend"/"midTermTrend" items), instead of a
 // bare cross, so the direction only flips once it's actually clear.
+//
+// Long-only for now: backtested over ETH/SOL 2021-2026 hourly data, shorting this
+// trend filter was a large net loser (crypto's underlying multi-year drift stayed up
+// even through the rough years) — dropping shorts took A-2x from +35.7% to +402.5%
+// total return and from -92.9% to -66.6% max drawdown. Revisit with a stricter,
+// short-specific signal before re-enabling.
 
 export function trendSide(dailyInd: Indicators): Side | null {
   if (dailyInd.sma200 === null) return null;
   const longOk = dailyInd.price >= dailyInd.sma200 * 1.03 && (dailyInd.sma50 === null || dailyInd.sma50 >= dailyInd.sma200 * 0.95);
-  const shortOk = dailyInd.price <= dailyInd.sma200 * 0.97 && (dailyInd.sma50 === null || dailyInd.sma50 <= dailyInd.sma200 * 1.05);
-  if (longOk) return "long";
-  if (shortOk) return "short";
-  return null; // inside the band, or SMA50 doesn't confirm — sit out rather than guess
+  return longOk ? "long" : null;
 }
 
 // --- Entry timing score (1h candles) ---------------------------------------------
@@ -73,8 +76,9 @@ export function sizePosition(
   leverage: number,
   price: number,
   minNotionalUsd: number,
+  riskPct: number = RISK_PCT_PER_TRADE,
 ): { margin: number; qty: number } | null {
-  const riskUsd = equity * (RISK_PCT_PER_TRADE / 100);
+  const riskUsd = equity * (riskPct / 100);
   const lossFractionOfMargin = (stopPct / 100) * leverage;
   const margin = riskUsd / lossFractionOfMargin;
   const notional = margin * leverage;
@@ -187,6 +191,7 @@ export function newTrade(
   qtyClosed: number,
   pnlUsd: number,
   reason: string,
+  nowMs: number = Date.now(),
 ): ClosedTrade {
   return {
     pair,
@@ -197,6 +202,6 @@ export function newTrade(
     pnlUsd,
     reason,
     openedAt: pos.openedAt,
-    closedAt: new Date().toISOString(),
+    closedAt: new Date(nowMs).toISOString(),
   };
 }

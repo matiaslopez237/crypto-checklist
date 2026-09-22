@@ -19,6 +19,7 @@ import type { Indicators, Pair } from "../src/lib/types";
 import { fetchLatestFuturesPrice } from "../src/lib/hourlyCandleCache";
 import { buildFuturesSummary } from "../src/lib/futuresSummary";
 import { emptyFuturesSimFile, emptyVariantState, type FuturesPair, type FuturesSimFile, type VariantKey } from "../src/lib/futuresTypes";
+import { evaluateBuyZone, markIfActive, rearmConditions } from "../src/lib/spotStrategy";
 
 export interface Env {
   TELEGRAM_BOT_TOKEN: string;
@@ -34,7 +35,7 @@ const POSITIONS_PATH = "monitor/positions.json";
 const PAPER_TRADING_PATH = "monitor/paper-trading.json";
 const FUTURES_SIM_PATH = "monitor/futures-simulation.json";
 const FUTURES_PAIRS: FuturesPair[] = ["ETHUSDT", "SOLUSDT"];
-const VARIANT_KEYS: VariantKey[] = ["A-2x", "B-2x", "B-3x"];
+const VARIANT_KEYS: VariantKey[] = ["A-2x", "B-2x"];
 
 interface PairAlertState {
   lastVerdict: string | null;
@@ -53,30 +54,6 @@ const EMPTY_STATE: PairAlertState = {
   technicalSellAlerted: false,
   trendBreakAlerted: false,
 };
-
-// How many extra points the buy score needs to gain (while still in the green
-// zone) before re-notifying — e.g. price kept dropping toward support, a better
-// entry than the one you were already told about.
-const BUY_SCORE_IMPROVEMENT_THRESHOLD = 15;
-
-// Hysteresis ("colchon"): an alert only re-arms once the condition has backed off
-// well past its trigger, not the instant it dips one tick below. Without this, a price
-// hovering right at a threshold (e.g. 3% take profit) flips the flag on/off every few
-// minutes and re-sends the same alert each time.
-const REARM_MARGIN_PCT = 1;
-// Buy zone starts at score 75; it only counts as "left" below this, so a single
-// criterion toggling (e.g. "near support", worth 20 pts) doesn't re-fire the entry alert.
-const BUY_ZONE_EXIT_SCORE = 65;
-
-function rearmConditions(ind: Indicators, pnlPct: number, stopLossPct: number, takeProfitPct: number) {
-  const distToResistance = ((ind.resistance20 - ind.price) / ind.resistance20) * 100;
-  return {
-    stopLoss: pnlPct > -stopLossPct + REARM_MARGIN_PCT,
-    takeProfit: pnlPct < takeProfitPct - REARM_MARGIN_PCT,
-    technical: ind.rsi14 === null || ind.rsi14 < 65 || distToResistance > 3,
-    trendBreak: ind.sma50 === null || ind.price > ind.sma50 * 1.01,
-  };
-}
 
 interface PriceAlert {
   id: string;
@@ -184,20 +161,6 @@ async function handleAlert(
   }
 }
 
-// Same on/off-with-rearm pattern as handleAlert, but for the paper position's own
-// dedup flags — kept separate since PaperPosition mixes booleans with numeric fields.
-function markIfActive(
-  pos: { stopLossAlerted: boolean; takeProfitAlerted: boolean; technicalSellAlerted: boolean; trendBreakAlerted: boolean },
-  flagKey: "stopLossAlerted" | "takeProfitAlerted" | "technicalSellAlerted" | "trendBreakAlerted",
-  isActive: boolean,
-  clearWhen: boolean = !isActive, // must imply !isActive; wider than it = hysteresis band
-): boolean {
-  const shouldFire = isActive && !pos[flagKey];
-  if (isActive) pos[flagKey] = true;
-  else if (clearWhen) pos[flagKey] = false;
-  return shouldFire;
-}
-
 async function checkPair(
   env: Env,
   pair: Pair,
@@ -227,43 +190,22 @@ async function checkPair(
   const state: PairAlertState = { ...EMPTY_STATE, ...(stored ? JSON.parse(stored) : {}) };
   const stateBefore = JSON.stringify(state);
 
-  let enteredBuyZoneNow = false;
-  let buyZoneImprovedEnough = false;
-  if (buyResult.verdict === "buy") {
-    const enteredNow = state.lastVerdict !== "buy";
-    const improvedEnough =
-      !enteredNow &&
-      state.lastNotifiedBuyScore !== null &&
-      buyResult.score >= state.lastNotifiedBuyScore + BUY_SCORE_IMPROVEMENT_THRESHOLD;
+  const previousBuyScore = state.lastNotifiedBuyScore; // for the "mejoró" message, before evaluateBuyZone overwrites it
+  const { enteredBuyZoneNow, buyZoneImprovedEnough } = evaluateBuyZone(state, buyResult);
 
-    enteredBuyZoneNow = enteredNow;
-    buyZoneImprovedEnough = improvedEnough;
-
-    if (enteredNow || improvedEnough) {
-      const passed = buyResult.items.filter((i) => i.passed).map((i) => `• ${i.label}`);
-      const heading = enteredNow
-        ? `🟢 <b>${label} entró en zona de compra</b>`
-        : `🟢📈 <b>${label} mejoró la zona de compra</b>\n(antes ${state.lastNotifiedBuyScore}/${buyResult.maxScore})`;
-      await sendTelegram(
-        env,
-        `${heading}\n` +
-          `Score: ${buyResult.score}/${buyResult.maxScore}\n` +
-          `Precio: $${ind.price.toFixed(2)}\n\n` +
-          `Cumple:\n${passed.join("\n")}`,
-      );
-      state.lastNotifiedBuyScore = buyResult.score;
-    }
+  if (enteredBuyZoneNow || buyZoneImprovedEnough) {
+    const passed = buyResult.items.filter((i) => i.passed).map((i) => `• ${i.label}`);
+    const heading = enteredBuyZoneNow
+      ? `🟢 <b>${label} entró en zona de compra</b>`
+      : `🟢📈 <b>${label} mejoró la zona de compra</b>\n(antes ${previousBuyScore}/${buyResult.maxScore})`;
+    await sendTelegram(
+      env,
+      `${heading}\n` +
+        `Score: ${buyResult.score}/${buyResult.maxScore}\n` +
+        `Precio: $${ind.price.toFixed(2)}\n\n` +
+        `Cumple:\n${passed.join("\n")}`,
+    );
   }
-
-  // A verdict slipping just under 75 doesn't count as leaving the zone until the score
-  // falls below BUY_ZONE_EXIT_SCORE, so a criterion flickering at its edge can't re-fire
-  // the entry alert (or a paper buy) every few minutes.
-  const stillInBuyZone = state.lastVerdict === "buy" && buyResult.score >= BUY_ZONE_EXIT_SCORE;
-  if (buyResult.verdict !== "buy" && !stillInBuyZone) {
-    // Reset so the next time it re-enters the green zone starts a fresh comparison.
-    state.lastNotifiedBuyScore = null;
-  }
-  state.lastVerdict = buyResult.verdict === "buy" || stillInBuyZone ? "buy" : buyResult.verdict;
 
   let pnlPct: number | null = null;
   const pos = positions[pair];

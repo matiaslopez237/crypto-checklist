@@ -1,7 +1,7 @@
 import { krakenPairCode } from "./krakenPairs";
 
 export type FuturesPair = "ETHUSDT" | "SOLUSDT";
-export type VariantKey = "A-2x" | "B-2x" | "B-3x";
+export type VariantKey = "A-2x" | "B-2x";
 export type Side = "long" | "short";
 
 export const FUTURES_KRAKEN_PAIRS: Record<FuturesPair, string> = {
@@ -24,11 +24,13 @@ export const PAIR_PARAMS: Record<FuturesPair, { stopPct: number; targetPct: numb
 export const VARIANT_PARAMS: Record<VariantKey, { leverage: number; exitStyle: "A" | "B" }> = {
   "A-2x": { leverage: 2, exitStyle: "A" },
   "B-2x": { leverage: 2, exitStyle: "B" },
-  "B-3x": { leverage: 3, exitStyle: "B" },
 };
 
 export const STARTING_CASH = 100;
-export const RISK_PCT_PER_TRADE = 4; // % of current equity risked (at the stop) per new trade
+// Backtested: 4% produced a -92.9% max drawdown (way past the ~20% target) even after
+// dropping shorts; 2% keeps it survivable (~-40%) without the $100 account being too
+// small to clear Binance's minimum notional on most entries, the way 1% was.
+export const RISK_PCT_PER_TRADE = 2; // % of current equity risked (at the stop) per new trade
 export const MAX_OPEN_POSITIONS = 2;
 export const DAILY_LOSS_PAUSE_PCT = 10; // pause new entries once today's PnL hits -10% of the day's starting equity
 export const TAKER_FEE_PCT = 0.05; // simplification: every entry/exit modeled as taker (worse case, matches Binance futures taker fee)
@@ -77,5 +79,5 @@ export function emptyVariantState(): VariantState {
 }
 
 export function emptyFuturesSimFile(): FuturesSimFile {
-  return { "A-2x": emptyVariantState(), "B-2x": emptyVariantState(), "B-3x": emptyVariantState() };
+  return { "A-2x": emptyVariantState(), "B-2x": emptyVariantState() };
 }

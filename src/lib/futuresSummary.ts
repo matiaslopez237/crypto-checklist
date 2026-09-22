@@ -3,9 +3,8 @@ import { computeEquity, unrealizedPnl } from "./futuresEngine";
 import { FUTURES_PAIR_LABELS, STARTING_CASH, type FuturesPair, type FuturesSimFile, type VariantKey } from "./futuresTypes";
 
 const VARIANT_LABELS: Record<VariantKey, string> = {
-  "A-2x": "Variante A (2x, todo al objetivo)",
-  "B-2x": "Variante B (2x, 50% + trailing)",
-  "B-3x": "Variante B (3x, 50% + trailing)",
+  "A-2x": "Variante A (todo al objetivo)",
+  "B-2x": "Variante B (50% + trailing)",
 };
 
 export function buildFuturesSummary(file: FuturesSimFile, prices: Partial<Record<FuturesPair, number>>): string {

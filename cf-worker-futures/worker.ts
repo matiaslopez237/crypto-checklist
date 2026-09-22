@@ -37,7 +37,7 @@ export interface Env {
 
 const SIM_PATH = "monitor/futures-simulation.json";
 const FUTURES_PAIRS: FuturesPair[] = ["ETHUSDT", "SOLUSDT"];
-const VARIANT_KEYS: VariantKey[] = ["A-2x", "B-2x", "B-3x"];
+const VARIANT_KEYS: VariantKey[] = ["A-2x", "B-2x"];
 
 function githubConfig(env: Env): GitHubRepoConfig {
   return { token: env.GITHUB_TOKEN, owner: env.GITHUB_OWNER, repo: env.GITHUB_REPO };
@@ -110,14 +110,14 @@ async function runFuturesCheck(env: Env): Promise<void> {
         if (action.type === "closeAll") {
           const { pnlUsd, marginReturned } = closeSlice(pos, data.price, pos.qtyRemaining);
           variant.cash += marginReturned + pnlUsd;
-          variant.trades.push(newTrade(pair, pos, data.price, pos.qtyRemaining, pnlUsd, action.reason));
+          variant.trades.push(newTrade(pair, pos, data.price, pos.qtyRemaining, pnlUsd, action.reason, now));
           delete variant.positions[pair];
           dirty = true;
         } else if (action.type === "closePartial") {
           const qtyToClose = pos.qtyRemaining * (action.pct / 100);
           const { pnlUsd, marginReturned } = closeSlice(pos, data.price, qtyToClose);
           variant.cash += marginReturned + pnlUsd;
-          variant.trades.push(newTrade(pair, pos, data.price, qtyToClose, pnlUsd, action.reason));
+          variant.trades.push(newTrade(pair, pos, data.price, qtyToClose, pnlUsd, action.reason, now));
           pos.qtyRemaining -= qtyToClose;
           pos.marginRemaining -= marginReturned;
           pos.partialTaken = true;

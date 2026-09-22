@@ -13,6 +13,7 @@ dist-ssr
 release
 .wrangler
 *.local
+scripts/.cache
 
 # Editor directories and files
 .vscode/*
