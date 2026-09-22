@@ -1,7 +1,7 @@
 // Cloudflare Worker: replaces the unreliable GitHub Actions schedule with
 // - fetch(): a Telegram webhook, so /comprar /vender /posicion /reset apply instantly
 // - scheduled(): a real cron trigger for the BTC/ETH market check + alerts
-import { fetchDailyKlines } from "../src/lib/kraken";
+import { getDailyCandles, fetchLatestCandle } from "../src/lib/candleCache";
 import { computeIndicators } from "../src/lib/indicators";
 import { buildBuyChecklist, buildSellChecklist } from "../src/lib/checklist";
 import { getGitHubFile, putGitHubFile, type GitHubRepoConfig } from "../src/lib/githubContents";
@@ -179,7 +179,7 @@ async function checkPair(
   paperPortfolio: PaperPortfolio,
 ): Promise<{ summary: PairSummary; firedAlertIds: string[] }> {
   const label = PAIR_LABELS[pair];
-  const candles = await fetchDailyKlines(pair, 210);
+  const candles = await getDailyCandles(env.MONITOR_STATE, pair, 210);
   const ind = computeIndicators(candles);
   const buyResult = buildBuyChecklist(ind);
 
@@ -400,7 +400,13 @@ async function runMarketCheck(env: Env): Promise<void> {
   }
 
   const now = new Date();
-  if (now.getUTCHours() === DIGEST_HOUR_UTC && summaries.length > 0) {
+  const allPairsOk = summaries.length === Object.keys(PAIR_LABELS).length;
+  // Kraken sometimes rejects a pair with "Too many requests" (checkPair's catch above
+  // logs it and drops that pair from `summaries` for this run). Only send+mark the
+  // digest once every pair came through clean, so a single unlucky rate-limit hit
+  // during the digest hour just gets retried by the next 5-minute run instead of
+  // permanently shipping an incomplete summary for the day.
+  if (now.getUTCHours() === DIGEST_HOUR_UTC && allPairsOk) {
     const todayStr = now.toISOString().slice(0, 10);
     const digestStored = await env.MONITOR_STATE.get(DIGEST_KEY);
     const lastDigestDate = digestStored ? JSON.parse(digestStored).lastDate : null;
@@ -427,8 +433,8 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
     const prices: Partial<Record<Pair, number>> = {};
     for (const pair of Object.keys(PAIR_LABELS) as Pair[]) {
       try {
-        const candles = await fetchDailyKlines(pair, 1);
-        prices[pair] = candles[candles.length - 1].close;
+        const latest = await fetchLatestCandle(pair);
+        prices[pair] = latest.close;
       } catch (err) {
         console.error(`Error fetching price for ${pair}:`, err);
       }
@@ -459,8 +465,8 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
     }
 
     try {
-      const candles = await fetchDailyKlines(pair, 1);
-      const currentPrice = candles[candles.length - 1].close;
+      const latest = await fetchLatestCandle(pair);
+      const currentPrice = latest.close;
       const alerts = await loadPriceAlerts(env);
       alerts.push({
         id: crypto.randomUUID(),
@@ -488,8 +494,8 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
     prices = {};
     for (const pair of Object.keys(PAIR_LABELS) as Pair[]) {
       try {
-        const candles = await fetchDailyKlines(pair, 1);
-        prices[pair] = candles[candles.length - 1].close;
+        const latest = await fetchLatestCandle(pair);
+        prices[pair] = latest.close;
       } catch (err) {
         console.error(`Error fetching price for ${pair}:`, err);
       }

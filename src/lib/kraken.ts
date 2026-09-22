@@ -14,9 +14,12 @@ interface KrakenOhlcResponse {
   result: Record<string, KrakenOhlcRow[] | number>;
 }
 
-export async function fetchDailyKlines(pair: Pair, limit = 210): Promise<Candle[]> {
+// `sinceSec` (unix seconds) makes Kraken return only candles after that time instead of
+// the full ~720-candle history — parsing that big payload was most of the CPU per run.
+async function fetchCandles(pair: Pair, sinceSec?: number): Promise<Candle[]> {
   const krakenPair = KRAKEN_PAIRS[pair];
-  const url = `https://api.kraken.com/0/public/OHLC?pair=${krakenPair}&interval=1440`;
+  const since = sinceSec !== undefined ? `&since=${Math.floor(sinceSec)}` : "";
+  const url = `https://api.kraken.com/0/public/OHLC?pair=${krakenPair}&interval=1440${since}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Kraken API error (${res.status}): ${res.statusText}`);
@@ -33,7 +36,7 @@ export async function fetchDailyKlines(pair: Pair, limit = 210): Promise<Candle[
   const rows = key ? (data.result[key] as KrakenOhlcRow[]) : null;
   if (!rows) throw new Error("Kraken API: no OHLC data in response");
 
-  const candles: Candle[] = rows.map(([time, open, high, low, close, , volume]) => ({
+  return rows.map(([time, open, high, low, close, , volume]) => ({
     openTime: time * 1000,
     open: Number(open),
     high: Number(high),
@@ -42,6 +45,12 @@ export async function fetchDailyKlines(pair: Pair, limit = 210): Promise<Candle[
     volume: Number(volume),
     closeTime: time * 1000 + 86399999,
   }));
+}
 
-  return candles.slice(-limit);
+export async function fetchDailyKlines(pair: Pair, limit = 210): Promise<Candle[]> {
+  return (await fetchCandles(pair)).slice(-limit);
+}
+
+export function fetchDailyKlinesSince(pair: Pair, sinceMs: number): Promise<Candle[]> {
+  return fetchCandles(pair, sinceMs / 1000);
 }
