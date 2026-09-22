@@ -3,7 +3,8 @@ main = "worker.ts"
 compatibility_date = "2026-09-01"
 
 [triggers]
-crons = ["*/10 * * * *"] # every 10 minutes: leveraged stops need a bit more reactivity than spot's 15
+crons = ["*/15 * * * *"] # same cadence as spot — entries are gated by 1h candles anyway, so checking
+# more often than that doesn't add real reactivity, just more Kraken calls per hour
 
 [vars]
 GITHUB_OWNER = "matiaslopez237"
