@@ -1,0 +1,110 @@
+{
+  "A-2x": {
+    "cash": 38.09523809523809,
+    "positions": {
+      "ETHUSDT": {
+        "side": "long",
+        "entryPrice": 2742.71,
+        "qty": 0.02430685951729008,
+        "qtyRemaining": 0.02430685951729008,
+        "margin": 33.333333333333336,
+        "marginRemaining": 33.333333333333336,
+        "leverage": 2,
+        "openedAt": "2026-09-22T13:40:44.997Z",
+        "partialTaken": false,
+        "bestPrice": 2742.71,
+        "lastFundingAt": "2026-09-22T13:40:44.997Z"
+      },
+      "SOLUSDT": {
+        "side": "long",
+        "entryPrice": 116.97,
+        "qty": 0.4885257514136714,
+        "qtyRemaining": 0.4885257514136714,
+        "margin": 28.57142857142857,
+        "marginRemaining": 28.57142857142857,
+        "leverage": 2,
+        "openedAt": "2026-09-22T13:40:44.997Z",
+        "partialTaken": false,
+        "bestPrice": 116.97,
+        "lastFundingAt": "2026-09-22T13:40:44.997Z"
+      }
+    },
+    "trades": [],
+    "dayStartEquity": 100,
+    "lastDay": "2026-09-22",
+    "paused": false,
+    "blockedCount": 0
+  },
+  "B-2x": {
+    "cash": 38.09523809523809,
+    "positions": {
+      "ETHUSDT": {
+        "side": "long",
+        "entryPrice": 2742.71,
+        "qty": 0.02430685951729008,
+        "qtyRemaining": 0.02430685951729008,
+        "margin": 33.333333333333336,
+        "marginRemaining": 33.333333333333336,
+        "leverage": 2,
+        "openedAt": "2026-09-22T13:40:44.997Z",
+        "partialTaken": false,
+        "bestPrice": 2742.71,
+        "lastFundingAt": "2026-09-22T13:40:44.997Z"
+      },
+      "SOLUSDT": {
+        "side": "long",
+        "entryPrice": 116.97,
+        "qty": 0.4885257514136714,
+        "qtyRemaining": 0.4885257514136714,
+        "margin": 28.57142857142857,
+        "marginRemaining": 28.57142857142857,
+        "leverage": 2,
+        "openedAt": "2026-09-22T13:40:44.997Z",
+        "partialTaken": false,
+        "bestPrice": 116.97,
+        "lastFundingAt": "2026-09-22T13:40:44.997Z"
+      }
+    },
+    "trades": [],
+    "dayStartEquity": 100,
+    "lastDay": "2026-09-22",
+    "paused": false,
+    "blockedCount": 0
+  },
+  "B-3x": {
+    "cash": 58.73015873015872,
+    "positions": {
+      "ETHUSDT": {
+        "side": "long",
+        "entryPrice": 2742.71,
+        "qty": 0.024306859517290072,
+        "qtyRemaining": 0.024306859517290072,
+        "margin": 22.22222222222222,
+        "marginRemaining": 22.22222222222222,
+        "leverage": 3,
+        "openedAt": "2026-09-22T13:40:44.997Z",
+        "partialTaken": false,
+        "bestPrice": 2742.71,
+        "lastFundingAt": "2026-09-22T13:40:44.997Z"
+      },
+      "SOLUSDT": {
+        "side": "long",
+        "entryPrice": 116.97,
+        "qty": 0.4885257514136714,
+        "qtyRemaining": 0.4885257514136714,
+        "margin": 19.047619047619047,
+        "marginRemaining": 19.047619047619047,
+        "leverage": 3,
+        "openedAt": "2026-09-22T13:40:44.997Z",
+        "partialTaken": false,
+        "bestPrice": 116.97,
+        "lastFundingAt": "2026-09-22T13:40:44.997Z"
+      }
+    },
+    "trades": [],
+    "dayStartEquity": 100,
+    "lastDay": "2026-09-22",
+    "paused": false,
+    "blockedCount": 0
+  }
+}
