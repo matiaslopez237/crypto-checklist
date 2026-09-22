@@ -14,7 +14,10 @@
     "electron:build": "tsc -b && vite build && electron-builder",
     "worker:typecheck": "tsc --project cf-worker/tsconfig.json",
     "worker:dev": "wrangler dev --local --config cf-worker/wrangler.toml",
-    "worker:deploy": "npm run worker:typecheck && wrangler deploy --config cf-worker/wrangler.toml"
+    "worker:deploy": "npm run worker:typecheck && wrangler deploy --config cf-worker/wrangler.toml",
+    "futures:typecheck": "tsc --project cf-worker-futures/tsconfig.json",
+    "futures:dev": "wrangler dev --local --config cf-worker-futures/wrangler.toml",
+    "futures:deploy": "npm run futures:typecheck && wrangler deploy --config cf-worker-futures/wrangler.toml"
   },
   "dependencies": {
     "react": "^19.2.7",

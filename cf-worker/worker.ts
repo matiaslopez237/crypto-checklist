@@ -16,6 +16,9 @@ import {
   type PaperPortfolio,
 } from "../src/lib/paperTrading";
 import type { Indicators, Pair } from "../src/lib/types";
+import { fetchLatestFuturesPrice } from "../src/lib/hourlyCandleCache";
+import { buildFuturesSummary } from "../src/lib/futuresSummary";
+import { emptyFuturesSimFile, emptyVariantState, type FuturesPair, type FuturesSimFile, type VariantKey } from "../src/lib/futuresTypes";
 
 export interface Env {
   TELEGRAM_BOT_TOKEN: string;
@@ -29,6 +32,9 @@ export interface Env {
 
 const POSITIONS_PATH = "monitor/positions.json";
 const PAPER_TRADING_PATH = "monitor/paper-trading.json";
+const FUTURES_SIM_PATH = "monitor/futures-simulation.json";
+const FUTURES_PAIRS: FuturesPair[] = ["ETHUSDT", "SOLUSDT"];
+const VARIANT_KEYS: VariantKey[] = ["A-2x", "B-2x", "B-3x"];
 
 interface PairAlertState {
   lastVerdict: string | null;
@@ -137,6 +143,27 @@ async function writePaperPortfolio(env: Env, portfolio: PaperPortfolio, sha: str
     JSON.stringify(portfolio, null, 2) + "\n",
     sha,
     "chore: actualizar simulacion de papel",
+  );
+}
+
+// Written by the separate crypto-checklist-futures-sim Worker; this Worker only reads
+// it (for /futuros) and flips `paused` (for /parar, /reanudar) — the actual trading
+// logic lives over there.
+async function readFuturesSim(env: Env): Promise<{ file: FuturesSimFile; sha?: string }> {
+  const file = await getGitHubFile(githubConfig(env), FUTURES_SIM_PATH);
+  if (!file) return { file: emptyFuturesSimFile() };
+  const parsed = JSON.parse(file.content) as FuturesSimFile;
+  for (const key of VARIANT_KEYS) if (!parsed[key]) parsed[key] = emptyVariantState();
+  return { file: parsed, sha: file.sha };
+}
+
+async function writeFuturesSim(env: Env, file: FuturesSimFile, sha: string | undefined): Promise<void> {
+  await putGitHubFile(
+    githubConfig(env),
+    FUTURES_SIM_PATH,
+    JSON.stringify(file, null, 2) + "\n",
+    sha,
+    "chore: pausar/reanudar simulacion de futuros",
   );
 }
 
@@ -440,6 +467,36 @@ async function handleTelegramWebhook(request: Request, env: Env): Promise<Respon
       }
     }
     await sendTelegram(env, buildPaperSummary(portfolio, prices));
+    return new Response("ok");
+  }
+
+  if (/^\/?futuros(@|$|\s)/i.test(text)) {
+    const { file } = await readFuturesSim(env);
+    const prices: Partial<Record<FuturesPair, number>> = {};
+    for (const pair of FUTURES_PAIRS) {
+      try {
+        prices[pair] = await fetchLatestFuturesPrice(pair);
+      } catch (err) {
+        console.error(`Error fetching futures price for ${pair}:`, err);
+      }
+    }
+    await sendTelegram(env, buildFuturesSummary(file, prices));
+    return new Response("ok");
+  }
+
+  if (/^\/?(parar|pausar)(@|$|\s)/i.test(text)) {
+    const { file, sha } = await readFuturesSim(env);
+    for (const key of VARIANT_KEYS) file[key].paused = true;
+    await writeFuturesSim(env, file, sha);
+    await sendTelegram(env, "⏸ Simulación de futuros pausada: no se abrirán posiciones nuevas (las abiertas se siguen gestionando). Usá /reanudar para volver a activarla.");
+    return new Response("ok");
+  }
+
+  if (/^\/?reanudar(@|$|\s)/i.test(text)) {
+    const { file, sha } = await readFuturesSim(env);
+    for (const key of VARIANT_KEYS) file[key].paused = false;
+    await writeFuturesSim(env, file, sha);
+    await sendTelegram(env, "▶️ Simulación de futuros reanudada.");
     return new Response("ok");
   }
 

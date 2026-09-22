@@ -1,0 +1,14 @@
+name = "crypto-checklist-futures-sim"
+main = "worker.ts"
+compatibility_date = "2026-09-01"
+
+[triggers]
+crons = ["*/10 * * * *"] # every 10 minutes: leveraged stops need a bit more reactivity than spot's 15
+
+[vars]
+GITHUB_OWNER = "matiaslopez237"
+GITHUB_REPO = "crypto-checklist"
+
+[[kv_namespaces]]
+binding = "MONITOR_STATE"
+id = "b541372b85d046c292b7121d56a987f0"
