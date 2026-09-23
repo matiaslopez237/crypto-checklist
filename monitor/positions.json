@@ -1,7 +1,7 @@
 {
   "BTCUSDT": {
-    "avgBuyPrice": null,
-    "qty": 0,
+    "avgBuyPrice": 85035.2,
+    "qty": 0.00003527950778030745,
     "stopLossPct": 10,
     "takeProfitPct": 3,
     "feePct": 0.1
