@@ -3,14 +3,14 @@
     "avgBuyPrice": 84495.17,
     "qty": 0.00003527950778030745,
     "stopLossPct": 10,
-    "takeProfitPct": 3,
+    "takeProfitPct": 15,
     "feePct": 0.1
   },
   "ETHUSDT": {
     "avgBuyPrice": 2743,
     "qty": 0.0019948363728041624,
     "stopLossPct": 10,
-    "takeProfitPct": 3,
+    "takeProfitPct": 15,
     "feePct": 0.1
   }
 }
