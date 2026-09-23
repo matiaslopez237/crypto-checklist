@@ -44,6 +44,7 @@ interface PairAlertState {
   takeProfitAlerted: boolean;
   technicalSellAlerted: boolean;
   trendBreakAlerted: boolean;
+  lastEntryAt: number | null;
 }
 
 const EMPTY_STATE: PairAlertState = {
@@ -53,6 +54,7 @@ const EMPTY_STATE: PairAlertState = {
   takeProfitAlerted: false,
   technicalSellAlerted: false,
   trendBreakAlerted: false,
+  lastEntryAt: null,
 };
 
 interface PriceAlert {
@@ -148,7 +150,7 @@ async function writeFuturesSim(env: Env, file: FuturesSimFile, sha: string | und
 // and re-arms once it clears — so a real trigger always gets a fresh alert.
 async function handleAlert(
   state: PairAlertState,
-  flagKey: keyof Omit<PairAlertState, "lastVerdict" | "lastNotifiedBuyScore">,
+  flagKey: keyof Omit<PairAlertState, "lastVerdict" | "lastNotifiedBuyScore" | "lastEntryAt">,
   isActive: boolean,
   notify: () => Promise<void>,
   clearWhen: boolean = !isActive, // must imply !isActive; wider than it = hysteresis band

@@ -133,7 +133,7 @@ async function main() {
       const buyResult = buildBuyChecklist(ind, BUY_CONFIG);
       const state = states[pair];
 
-      const { enteredBuyZoneNow, buyZoneImprovedEnough } = evaluateBuyZone(state, buyResult, SCORE_IMPROVEMENT, ZONE_EXIT_SCORE);
+      const { enteredBuyZoneNow, buyZoneImprovedEnough } = evaluateBuyZone(state, buyResult, SCORE_IMPROVEMENT, ZONE_EXIT_SCORE, Date.parse(date));
       if (enteredBuyZoneNow || buyZoneImprovedEnough) {
         const cashBefore = portfolio.cashUsdt;
         applyPaperBuy(portfolio, pair, ind.price, enteredBuyZoneNow ? "entrada en zona de compra" : "mejora de zona de compra", ALLOCATION_PCT);

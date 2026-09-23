@@ -49,9 +49,15 @@ export function markIfActive(
   return shouldFire;
 }
 
+// The live Worker re-scores the still-forming daily candle every 15 minutes, so a
+// score hovering at the buy cutoff can leave and re-enter the zone several times in
+// one day. A daily-timeframe signal shouldn't fire more than once per day.
+export const ENTRY_COOLDOWN_MS = 24 * 3600_000;
+
 export interface BuyZoneState {
   lastVerdict: string | null;
   lastNotifiedBuyScore: number | null;
+  lastEntryAt?: number | null;
 }
 
 // Mutates `state` in place (same convention as the Worker's PairAlertState) and
@@ -62,12 +68,17 @@ export function evaluateBuyZone(
   buyResult: BuyChecklistResult,
   scoreImprovementThreshold = BUY_SCORE_IMPROVEMENT_THRESHOLD,
   buyZoneExitScore = BUY_ZONE_EXIT_SCORE,
+  nowMs: number = Date.now(),
 ): { enteredBuyZoneNow: boolean; buyZoneImprovedEnough: boolean } {
   let enteredBuyZoneNow = false;
   let buyZoneImprovedEnough = false;
 
   if (buyResult.verdict === "buy") {
-    const enteredNow = state.lastVerdict !== "buy";
+    // Re-entry inside the cooldown is the same signal again: resume silently, still
+    // comparing improvements against the score that was actually notified.
+    const cooledDown = state.lastEntryAt == null || nowMs - state.lastEntryAt >= ENTRY_COOLDOWN_MS;
+    const enteredNow = state.lastVerdict !== "buy" && cooledDown;
+    if (enteredNow) state.lastEntryAt = nowMs;
     const improvedEnough =
       !enteredNow && state.lastNotifiedBuyScore !== null && buyResult.score >= state.lastNotifiedBuyScore + scoreImprovementThreshold;
 
@@ -81,7 +92,8 @@ export function evaluateBuyZone(
   // the score falls below buyZoneExitScore, so a criterion flickering at its edge can't
   // re-fire the entry alert (or a paper buy) every few minutes.
   const stillInBuyZone = state.lastVerdict === "buy" && buyResult.score >= buyZoneExitScore;
-  if (buyResult.verdict !== "buy" && !stillInBuyZone) {
+  const inCooldown = state.lastEntryAt != null && nowMs - state.lastEntryAt < ENTRY_COOLDOWN_MS;
+  if (buyResult.verdict !== "buy" && !stillInBuyZone && !inCooldown) {
     state.lastNotifiedBuyScore = null;
   }
   state.lastVerdict = buyResult.verdict === "buy" || stillInBuyZone ? "buy" : buyResult.verdict;
