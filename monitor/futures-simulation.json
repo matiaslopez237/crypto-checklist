@@ -1,6 +1,6 @@
 {
   "A-2x": {
-    "cash": 69.01847956072768,
+    "cash": 69.01562241787055,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -13,7 +13,7 @@
         "openedAt": "2026-09-22T14:30:27.323Z",
         "partialTaken": false,
         "bestPrice": 116.99,
-        "lastFundingAt": "2026-09-25T06:30:27.323Z"
+        "lastFundingAt": "2026-09-25T14:30:27.323Z"
       },
       "ETHUSDT": {
         "side": "long",
@@ -36,7 +36,7 @@
     "blockedCount": 0
   },
   "B-2x": {
-    "cash": 69.01847956072768,
+    "cash": 69.01562241787055,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -49,7 +49,7 @@
         "openedAt": "2026-09-22T14:30:27.323Z",
         "partialTaken": false,
         "bestPrice": 116.99,
-        "lastFundingAt": "2026-09-25T06:30:27.323Z"
+        "lastFundingAt": "2026-09-25T14:30:27.323Z"
       },
       "ETHUSDT": {
         "side": "long",
