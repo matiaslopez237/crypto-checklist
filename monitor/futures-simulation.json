@@ -1,6 +1,6 @@
 {
   "A-2x": {
-    "cash": 69.00943601203204,
+    "cash": 69.00610674905067,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -26,7 +26,7 @@
         "openedAt": "2026-09-22T14:45:26.601Z",
         "partialTaken": false,
         "bestPrice": 2729.99,
-        "lastFundingAt": "2026-09-25T14:45:26.601Z"
+        "lastFundingAt": "2026-09-25T22:45:26.601Z"
       }
     },
     "trades": [],
@@ -36,7 +36,7 @@
     "blockedCount": 0
   },
   "B-2x": {
-    "cash": 69.00943601203204,
+    "cash": 69.00610674905067,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -62,7 +62,7 @@
         "openedAt": "2026-09-22T14:45:26.601Z",
         "partialTaken": false,
         "bestPrice": 2729.99,
-        "lastFundingAt": "2026-09-25T14:45:26.601Z"
+        "lastFundingAt": "2026-09-25T22:45:26.601Z"
       }
     },
     "trades": [],
