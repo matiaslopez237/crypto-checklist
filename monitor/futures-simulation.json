@@ -1,6 +1,6 @@
 {
   "A-2x": {
-    "cash": 68.85763300892654,
+    "cash": 68.85144660308804,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -13,7 +13,7 @@
         "openedAt": "2026-09-22T14:30:27.323Z",
         "partialTaken": false,
         "bestPrice": 116.99,
-        "lastFundingAt": "2026-10-03T22:30:27.323Z"
+        "lastFundingAt": "2026-10-04T06:30:27.323Z"
       },
       "ETHUSDT": {
         "side": "long",
@@ -26,17 +26,17 @@
         "openedAt": "2026-09-22T14:45:26.601Z",
         "partialTaken": false,
         "bestPrice": 2729.99,
-        "lastFundingAt": "2026-10-03T22:45:26.601Z"
+        "lastFundingAt": "2026-10-04T06:45:26.601Z"
       }
     },
     "trades": [],
-    "dayStartEquity": 99.81382387047951,
-    "lastDay": "2026-10-03",
+    "dayStartEquity": 100.35142386313558,
+    "lastDay": "2026-10-04",
     "paused": false,
     "blockedCount": 0
   },
   "B-2x": {
-    "cash": 68.85763300892654,
+    "cash": 68.85144660308804,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -49,7 +49,7 @@
         "openedAt": "2026-09-22T14:30:27.323Z",
         "partialTaken": false,
         "bestPrice": 116.99,
-        "lastFundingAt": "2026-10-03T22:30:27.323Z"
+        "lastFundingAt": "2026-10-04T06:30:27.323Z"
       },
       "ETHUSDT": {
         "side": "long",
@@ -62,12 +62,12 @@
         "openedAt": "2026-09-22T14:45:26.601Z",
         "partialTaken": false,
         "bestPrice": 2729.99,
-        "lastFundingAt": "2026-10-03T22:45:26.601Z"
+        "lastFundingAt": "2026-10-04T06:45:26.601Z"
       }
     },
     "trades": [],
-    "dayStartEquity": 99.81382387047951,
-    "lastDay": "2026-10-03",
+    "dayStartEquity": 100.35142386313558,
+    "lastDay": "2026-10-04",
     "paused": false,
     "blockedCount": 0
   }
