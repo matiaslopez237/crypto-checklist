@@ -1,6 +1,6 @@
 {
   "A-2x": {
-    "cash": 68.79576895054149,
+    "cash": 83.35944631948212,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -14,29 +14,28 @@
         "partialTaken": false,
         "bestPrice": 116.99,
         "lastFundingAt": "2026-10-07T06:30:27.323Z"
-      },
-      "ETHUSDT": {
-        "side": "long",
-        "entryPrice": 2729.99,
-        "qty": 0.012195147166729549,
-        "qtyRemaining": 0.012195147166729549,
-        "margin": 16.646314906849998,
-        "marginRemaining": 16.646314906849998,
-        "leverage": 2,
-        "openedAt": "2026-09-22T14:45:26.601Z",
-        "partialTaken": false,
-        "bestPrice": 2729.99,
-        "lastFundingAt": "2026-10-07T06:45:26.601Z"
       }
     },
-    "trades": [],
+    "trades": [
+      {
+        "pair": "ETHUSDT",
+        "side": "long",
+        "entryPrice": 2729.99,
+        "exitPrice": 2561.86,
+        "qty": 0.012195147166729549,
+        "pnlUsd": -2.082637537909364,
+        "reason": "stop loss",
+        "openedAt": "2026-09-22T14:45:26.601Z",
+        "closedAt": "2026-10-07T13:15:46.953Z"
+      }
+    ],
     "dayStartEquity": 98.88130736015121,
     "lastDay": "2026-10-07",
     "paused": false,
     "blockedCount": 0
   },
   "B-2x": {
-    "cash": 68.79576895054149,
+    "cash": 83.35944631948212,
     "positions": {
       "SOLUSDT": {
         "side": "long",
@@ -50,22 +49,21 @@
         "partialTaken": false,
         "bestPrice": 116.99,
         "lastFundingAt": "2026-10-07T06:30:27.323Z"
-      },
-      "ETHUSDT": {
-        "side": "long",
-        "entryPrice": 2729.99,
-        "qty": 0.012195147166729549,
-        "qtyRemaining": 0.012195147166729549,
-        "margin": 16.646314906849998,
-        "marginRemaining": 16.646314906849998,
-        "leverage": 2,
-        "openedAt": "2026-09-22T14:45:26.601Z",
-        "partialTaken": false,
-        "bestPrice": 2729.99,
-        "lastFundingAt": "2026-10-07T06:45:26.601Z"
       }
     },
-    "trades": [],
+    "trades": [
+      {
+        "pair": "ETHUSDT",
+        "side": "long",
+        "entryPrice": 2729.99,
+        "exitPrice": 2561.86,
+        "qty": 0.012195147166729549,
+        "pnlUsd": -2.082637537909364,
+        "reason": "stop loss",
+        "openedAt": "2026-09-22T14:45:26.601Z",
+        "closedAt": "2026-10-07T13:15:46.953Z"
+      }
+    ],
     "dayStartEquity": 98.88130736015121,
     "lastDay": "2026-10-07",
     "paused": false,
