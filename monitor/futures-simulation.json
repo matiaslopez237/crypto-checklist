@@ -1,20 +1,7 @@
 {
   "A-2x": {
-    "cash": 67.0962348717723,
+    "cash": 79.32979695888596,
     "positions": {
-      "SOLUSDT": {
-        "side": "long",
-        "entryPrice": 116.99,
-        "qty": 0.24422111780005618,
-        "qtyRemaining": 0.24422111780005618,
-        "margin": 14.285714285714285,
-        "marginRemaining": 14.285714285714285,
-        "leverage": 2,
-        "openedAt": "2026-09-22T14:30:27.323Z",
-        "partialTaken": false,
-        "bestPrice": 116.99,
-        "lastFundingAt": "2026-10-08T14:30:27.323Z"
-      },
       "ETHUSDT": {
         "side": "long",
         "entryPrice": 2562.46,
@@ -40,6 +27,17 @@
         "reason": "stop loss",
         "openedAt": "2026-09-22T14:45:26.601Z",
         "closedAt": "2026-10-07T13:15:46.953Z"
+      },
+      {
+        "pair": "SOLUSDT",
+        "side": "long",
+        "entryPrice": 116.99,
+        "exitPrice": 108.7,
+        "qty": 0.24422111780005618,
+        "pnlUsd": -2.052152198600611,
+        "reason": "stop loss",
+        "openedAt": "2026-09-22T14:30:27.323Z",
+        "closedAt": "2026-10-08T16:00:39.703Z"
       }
     ],
     "dayStartEquity": 97.28379869155528,
@@ -48,21 +46,8 @@
     "blockedCount": 0
   },
   "B-2x": {
-    "cash": 67.0962348717723,
+    "cash": 79.32979695888596,
     "positions": {
-      "SOLUSDT": {
-        "side": "long",
-        "entryPrice": 116.99,
-        "qty": 0.24422111780005618,
-        "qtyRemaining": 0.24422111780005618,
-        "margin": 14.285714285714285,
-        "marginRemaining": 14.285714285714285,
-        "leverage": 2,
-        "openedAt": "2026-09-22T14:30:27.323Z",
-        "partialTaken": false,
-        "bestPrice": 116.99,
-        "lastFundingAt": "2026-10-08T14:30:27.323Z"
-      },
       "ETHUSDT": {
         "side": "long",
         "entryPrice": 2562.46,
@@ -88,6 +73,17 @@
         "reason": "stop loss",
         "openedAt": "2026-09-22T14:45:26.601Z",
         "closedAt": "2026-10-07T13:15:46.953Z"
+      },
+      {
+        "pair": "SOLUSDT",
+        "side": "long",
+        "entryPrice": 116.99,
+        "exitPrice": 108.7,
+        "qty": 0.24422111780005618,
+        "pnlUsd": -2.052152198600611,
+        "reason": "stop loss",
+        "openedAt": "2026-09-22T14:30:27.323Z",
+        "closedAt": "2026-10-08T16:00:39.703Z"
       }
     ],
     "dayStartEquity": 97.28379869155528,
