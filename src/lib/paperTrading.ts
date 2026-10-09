@@ -45,7 +45,7 @@ export function emptyPaperPortfolio(): PaperPortfolio {
   return { cashUsdt: PAPER_STARTING_CASH, positions: {}, trades: [] };
 }
 
-export function applyPaperBuy(portfolio: PaperPortfolio, pair: Pair, price: number, reason: string, allocationPct = BUY_ALLOCATION_PCT): void {
+export function applyPaperBuy(portfolio: PaperPortfolio, pair: Pair, price: number, reason: string, allocationPct = BUY_ALLOCATION_PCT, feePct = PAPER_THRESHOLDS.feePct): void {
   const amountUsdt = portfolio.cashUsdt * (allocationPct / 100);
   if (amountUsdt < 1) return; // not enough fake cash left to bother
 
@@ -53,7 +53,7 @@ export function applyPaperBuy(portfolio: PaperPortfolio, pair: Pair, price: numb
   const existingCost = existing.avgBuyPrice ? existing.qty * existing.avgBuyPrice : 0;
   // Exchange fee comes out of what was spent, so fewer units are received. avgBuyPrice
   // stays the raw execution price (the net-PnL formula adds the entry fee itself).
-  const newQty = (amountUsdt * (1 - PAPER_THRESHOLDS.feePct / 100)) / price;
+  const newQty = (amountUsdt * (1 - feePct / 100)) / price;
   const totalQty = existing.qty + newQty;
 
   portfolio.positions[pair] = { ...existing, qty: totalQty, avgBuyPrice: (existingCost + newQty * price) / totalQty };
@@ -61,12 +61,12 @@ export function applyPaperBuy(portfolio: PaperPortfolio, pair: Pair, price: numb
   portfolio.trades.push({ date: new Date().toISOString(), pair, side: "buy", price, amountUsdt, reason });
 }
 
-export function applyPaperSell(portfolio: PaperPortfolio, pair: Pair, price: number, sellPct: number, reason: string): void {
+export function applyPaperSell(portfolio: PaperPortfolio, pair: Pair, price: number, sellPct: number, reason: string, feePct = PAPER_THRESHOLDS.feePct): void {
   const pos = portfolio.positions[pair];
   if (!pos || pos.qty <= 0) return;
 
   const qtyToSell = pos.qty * (sellPct / 100);
-  const proceeds = qtyToSell * price * (1 - PAPER_THRESHOLDS.feePct / 100);
+  const proceeds = qtyToSell * price * (1 - feePct / 100);
   const newQty = pos.qty - qtyToSell;
 
   portfolio.positions[pair] = { ...pos, qty: newQty, avgBuyPrice: newQty > 1e-12 ? pos.avgBuyPrice : null };

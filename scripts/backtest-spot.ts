@@ -52,6 +52,7 @@ function definedOnly<T extends object>(obj: T): Partial<T> {
 const THRESHOLDS = {
   ...PAPER_THRESHOLDS,
   stopLossPct: envNum("STOP_LOSS_PCT", PAPER_THRESHOLDS.stopLossPct),
+  feePct: envNum("FEE_PCT", PAPER_THRESHOLDS.feePct),
   takeProfitPct: envNum("TAKE_PROFIT_PCT", PAPER_THRESHOLDS.takeProfitPct),
 };
 const SELL_OVERBOUGHT_RSI = envNum("SELL_OVERBOUGHT_RSI", DEFAULT_OVERBOUGHT_RSI_THRESHOLD);
@@ -119,7 +120,13 @@ async function main() {
     }
   }
 
-  const commonDates = [...indicatorsByDate.BTCUSDT.keys()].filter((d) => indicatorsByDate.ETHUSDT.has(d)).sort();
+  // FROM/TO (YYYY-MM-DD) restrict the walked period for walk-forward tests; indicators
+  // still use all history before each day, so there's no lookahead either way.
+  const from = process.env.FROM ?? "0000";
+  const to = process.env.TO ?? "9999";
+  const commonDates = [...indicatorsByDate.BTCUSDT.keys()]
+    .filter((d) => indicatorsByDate.ETHUSDT.has(d) && d >= from && d <= to)
+    .sort();
   console.log(`Periodo del backtest: ${commonDates[0]} a ${commonDates.at(-1)} (${commonDates.length} dias)\n`);
 
   const portfolio: PaperPortfolio = emptyPaperPortfolio();
@@ -136,7 +143,7 @@ async function main() {
       const { enteredBuyZoneNow, buyZoneImprovedEnough } = evaluateBuyZone(state, buyResult, SCORE_IMPROVEMENT, ZONE_EXIT_SCORE, Date.parse(date));
       if (enteredBuyZoneNow || buyZoneImprovedEnough) {
         const cashBefore = portfolio.cashUsdt;
-        applyPaperBuy(portfolio, pair, ind.price, enteredBuyZoneNow ? "entrada en zona de compra" : "mejora de zona de compra", ALLOCATION_PCT);
+        applyPaperBuy(portfolio, pair, ind.price, enteredBuyZoneNow ? "entrada en zona de compra" : "mejora de zona de compra", ALLOCATION_PCT, THRESHOLDS.feePct);
         if (portfolio.cashUsdt !== cashBefore) trades.push({ date, pair, side: "buy", price: ind.price, pnlPct: null, reason: enteredBuyZoneNow ? "entrada" : "mejora" });
       }
 
@@ -158,11 +165,11 @@ async function main() {
         const trendBreakNew = markIfActive(paperPos, "trendBreakAlerted", paperSell.trendBreak.passed, paperRearm.trendBreak);
 
         if (stopLossNew) {
-          applyPaperSell(portfolio, pair, ind.price, 100, "stop loss");
+          applyPaperSell(portfolio, pair, ind.price, 100, "stop loss", THRESHOLDS.feePct);
           trades.push({ date, pair, side: "sell", price: ind.price, pnlPct: paperSell.pnlPct, reason: "stop loss" });
         } else if ((takeProfitNew || technicalNew || trendBreakNew) && paperSell.suggestedSellPct > 0) {
           const reasons = [takeProfitNew && "take profit", technicalNew && "señal técnica", trendBreakNew && "ruptura de tendencia"].filter(Boolean).join(" + ");
-          applyPaperSell(portfolio, pair, ind.price, paperSell.suggestedSellPct, reasons);
+          applyPaperSell(portfolio, pair, ind.price, paperSell.suggestedSellPct, reasons, THRESHOLDS.feePct);
           trades.push({ date, pair, side: "sell", price: ind.price, pnlPct: paperSell.pnlPct, reason: reasons });
         }
       } else if (portfolio.positions[pair]) {

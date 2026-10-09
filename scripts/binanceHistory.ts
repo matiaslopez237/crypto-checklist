@@ -11,7 +11,7 @@ import type { Candle } from "../src/lib/types";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = join(__dirname, ".cache");
 
-type BinanceInterval = "1d" | "1h";
+type BinanceInterval = "1d" | "1h" | "5m" | "1m";
 
 interface BinanceKlineRow extends Array<number | string> {
   0: number; // open time
@@ -25,9 +25,17 @@ interface BinanceKlineRow extends Array<number | string> {
 
 async function fetchKlinesPage(symbol: string, interval: BinanceInterval, startTime: number): Promise<BinanceKlineRow[]> {
   const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${startTime}&limit=1000`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Binance API error (${res.status}) para ${symbol} ${interval}`);
-  return (await res.json()) as BinanceKlineRow[];
+  // Long downloads (hundreds of pages) occasionally hit a dropped connection.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Binance API error (${res.status}) para ${symbol} ${interval}`);
+      return (await res.json()) as BinanceKlineRow[];
+    } catch (err) {
+      if (attempt >= 5) throw err;
+      await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
+  }
 }
 
 function toCandle(row: BinanceKlineRow): Candle {
